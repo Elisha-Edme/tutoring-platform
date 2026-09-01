@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { getUserByEmail, createUser, createParentProfile } from '@/lib/sheets'
-import { hashPassword, signSession } from '@/lib/auth'
+import { signSession } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const userId = randomUUID()
     const now = new Date().toISOString()
-    const passwordHash = hashPassword(password)
+    const passwordHash = password // plaintext (demo); re-add hashing before launch
 
     await createUser({ id: userId, email, name, role: 'parent', passwordHash, createdAt: now })
     await createParentProfile({ userId, email, name, children })

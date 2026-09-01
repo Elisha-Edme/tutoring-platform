@@ -3,14 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
-const GRADES = ['K', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th']
-const INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Trumpet', 'Drums', 'Flute', 'Alto Saxophone', 'Tuba', 'Trombone', 'Other']
+import { GRADES, CHILD_INSTRUMENTS } from '@/lib/constants'
 
 interface Child {
   name: string
   grade: string
-  instrument: string
+  instruments: string[]
 }
 
 export default function SignUpForm() {
@@ -19,15 +17,23 @@ export default function SignUpForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [children, setChildren] = useState<Child[]>([{ name: '', grade: '', instrument: '' }])
+  const [children, setChildren] = useState<Child[]>([{ name: '', grade: '', instruments: [] }])
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
-  const updateChild = (index: number, field: keyof Child, value: string) => {
+  const updateChild = (index: number, field: 'name' | 'grade', value: string) => {
     setChildren(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c))
   }
 
-  const addChild = () => setChildren(prev => [...prev, { name: '', grade: '', instrument: '' }])
+  const toggleInstrument = (index: number, inst: string) => {
+    setChildren(prev => prev.map((c, i) => {
+      if (i !== index) return c
+      const has = c.instruments.includes(inst)
+      return { ...c, instruments: has ? c.instruments.filter(x => x !== inst) : [...c.instruments, inst] }
+    }))
+  }
+
+  const addChild = () => setChildren(prev => [...prev, { name: '', grade: '', instruments: [] }])
   const removeChild = (index: number) => setChildren(prev => prev.filter((_, i) => i !== index))
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -36,6 +42,12 @@ export default function SignUpForm() {
     if (password !== confirmPassword) {
       setStatus('error')
       setErrorMsg('Passwords do not match.')
+      return
+    }
+
+    if (children.some(c => c.instruments.length === 0)) {
+      setStatus('error')
+      setErrorMsg('Please select at least one instrument for each child.')
       return
     }
 
@@ -110,17 +122,32 @@ export default function SignUpForm() {
               <input type="text" required placeholder="Child's name" value={child.name}
                 onChange={e => updateChild(i, 'name', e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-              <div className="grid grid-cols-2 gap-3">
-                <select required value={child.grade} onChange={e => updateChild(i, 'grade', e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                  <option value="">Grade...</option>
-                  {GRADES.map(g => <option key={g}>{g}</option>)}
-                </select>
-                <select required value={child.instrument} onChange={e => updateChild(i, 'instrument', e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
-                  <option value="">Instrument...</option>
-                  {INSTRUMENTS.map(inst => <option key={inst}>{inst}</option>)}
-                </select>
+              <select required value={child.grade} onChange={e => updateChild(i, 'grade', e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
+                <option value="">Grade...</option>
+                {GRADES.map(g => <option key={g}>{g}</option>)}
+              </select>
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Instrument(s) — select all that apply</p>
+                <div className="flex flex-wrap gap-2">
+                  {CHILD_INSTRUMENTS.map(inst => {
+                    const selected = child.instruments.includes(inst)
+                    return (
+                      <button
+                        key={inst}
+                        type="button"
+                        onClick={() => toggleInstrument(i, inst)}
+                        className={`px-3 py-1 rounded-full text-sm border transition ${
+                          selected
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'border-gray-300 text-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        {inst}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           ))}

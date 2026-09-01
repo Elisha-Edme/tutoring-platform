@@ -1,15 +1,10 @@
 import Navbar from '@/components/Navbar'
-import { getAllTutors } from '@/lib/sheets'
 import TutorGrid from './TutorGrid'
-import type { TutorProfile } from '@/lib/types'
+import { getSession } from '@/lib/auth'
 
 export default async function TutorsPage() {
-  let tutors: TutorProfile[] = []
-  try {
-    tutors = await getAllTutors()
-  } catch {
-    // Sheets not configured yet — show empty state
-  }
+  const session = await getSession()
+  const isParent = session?.role === 'parent'
 
   return (
     <main className="min-h-screen bg-white">
@@ -19,13 +14,10 @@ export default async function TutorsPage() {
         <p className="text-gray-600 mb-10">
           High school musicians offering free lessons to elementary and middle school students.
         </p>
-        {tutors.length === 0 ? (
-          <p className="text-gray-400 text-sm">
-            No tutors yet. Use the admin panel to seed tutors.
-          </p>
-        ) : (
-          <TutorGrid tutors={tutors} />
-        )}
+        {/* TutorGrid fetches /api/tutors on the client — keeps googleapis out of
+            the page render, which crashes Next.js 16 with "ArrayBuffer is not
+            detachable". Route handlers read Sheets fine. */}
+        <TutorGrid isParent={isParent} />
       </div>
     </main>
   )

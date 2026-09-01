@@ -1,9 +1,9 @@
-import { SignJWT, jwtVerify } from 'jose'
+import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
-import { scryptSync, randomBytes, timingSafeEqual } from 'crypto'
+import { timingSafeEqual, createHmac } from 'crypto'
 import type { SessionPayload } from './types'
 
-function getSecret() {
+function getJoseSecret() {
   return new TextEncoder().encode(process.env.JWT_SECRET!)
 }
 
@@ -11,13 +11,23 @@ export async function signSession(payload: SessionPayload): Promise<string> {
   return new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('30d')
-    .sign(getSecret())
+    .sign(getJoseSecret())
 }
 
-export async function verifySession(token: string): Promise<SessionPayload | null> {
+// Use Node's native crypto instead of jose's jwtVerify to avoid the
+// "ArrayBuffer is not detachable" error in React Server Components.
+export function verifySessionSync(token: string): SessionPayload | null {
   try {
-    const { payload } = await jwtVerify(token, getSecret())
-    return payload as unknown as SessionPayload
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [header, payload, signature] = parts
+    const expected = createHmac('sha256', process.env.JWT_SECRET!)
+      .update(`${header}.${payload}`)
+      .digest('base64url')
+    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null
+    return decoded as SessionPayload
   } catch {
     return null
   }
@@ -27,22 +37,8 @@ export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get('session')?.value
   if (!token) return null
-  return verifySession(token)
+  return verifySessionSync(token)
 }
 
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(password, salt, 64).toString('hex')
-  return `${salt}:${hash}`
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  try {
-    const [salt, hash] = stored.split(':')
-    const hashBuffer = Buffer.from(hash, 'hex')
-    const derived = scryptSync(password, salt, 64)
-    return timingSafeEqual(hashBuffer, derived)
-  } catch {
-    return false
-  }
-}
+// NOTE: passwords are stored in plaintext for demo visibility. Before any real
+// launch, re-introduce hashing here and at the signup/signin/admin call sites.

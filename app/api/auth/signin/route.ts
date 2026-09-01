@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserByEmail } from '@/lib/sheets'
-import { verifyPassword, signSession } from '@/lib/auth'
+import { signSession } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await getUserByEmail(email)
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!user || user.passwordHash !== password) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
 

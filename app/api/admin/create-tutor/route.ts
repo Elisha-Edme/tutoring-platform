@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { getUserByEmail, createUser, createTutorProfile } from '@/lib/sheets'
+import { DEFAULT_TUTOR_PASSWORD, DEFAULT_AVATAR_URL } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,8 +19,9 @@ export async function POST(request: NextRequest) {
 
     const userId = randomUUID()
     const now = new Date().toISOString()
+    const passwordHash = DEFAULT_TUTOR_PASSWORD // plaintext (demo)
 
-    await createUser({ id: userId, email, name, role: 'tutor', passwordHash: '', createdAt: now })
+    await createUser({ id: userId, email, name, role: 'tutor', passwordHash, createdAt: now })
     await createTutorProfile({
       userId, email, name,
       instruments: Array.isArray(instruments) ? instruments : [instruments],
@@ -27,8 +29,9 @@ export async function POST(request: NextRequest) {
       school: school ?? '',
       credentials: credentials ?? '',
       location: location ?? '',
-      photoUrl: '',
-      sessionCount: 0,
+      photoUrl: DEFAULT_AVATAR_URL,
+      lessonsCompleted: 0,
+      hoursCompleted: 0,
       rating: 0,
     })
 
