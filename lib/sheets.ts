@@ -4,11 +4,19 @@ import type {
   TutorAvailabilityRule, AvailabilityException, LessonRequest, TutorStudent,
 } from './types'
 
+function getPrivateKey(): string {
+  // Prefer base64-encoded key (avoids all newline escaping issues on Vercel)
+  if (process.env.GOOGLE_PRIVATE_KEY_B64) {
+    return Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8')
+  }
+  return (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n')
+}
+
 function getAuth() {
   return new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      private_key: getPrivateKey(),
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   })
