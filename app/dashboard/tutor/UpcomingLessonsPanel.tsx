@@ -9,7 +9,7 @@ type View = 'box' | 'calendar'
 export default function UpcomingLessonsPanel() {
   const [lessons, setLessons] = useState<UpcomingLesson[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<View>('box')
+  const [view, setView] = useState<View>('calendar')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -105,8 +105,8 @@ export default function UpcomingLessonsPanel() {
     <div>
       {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
       <div className="flex gap-2 mb-4">
-        <button onClick={() => setView('box')} className={tabCls('box')}>Box view</button>
         <button onClick={() => setView('calendar')} className={tabCls('calendar')}>Calendar</button>
+        <button onClick={() => setView('box')} className={tabCls('box')}>Box view</button>
       </div>
       {view === 'box'
         ? (

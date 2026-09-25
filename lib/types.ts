@@ -65,15 +65,37 @@ export interface TutorAvailabilityRule {
   createdAt: string
 }
 
+// A 'booked' row is system-written only (never via the manual Exception
+// form) — one per *recurring* live LessonRequest (repeatType !== 'once'),
+// created/updated/deleted alongside that booking's own lifecycle (see
+// materializeFirstOccurrence / deleteBookingException in
+// lib/booking-completion.ts) so the tutor's own weekly schedule view can show
+// it. It is NOT read by getAvailableWindows/getBookedIntervals — those stay
+// derived live from LessonRequests+Lessons, so a sync bug here can only ever
+// produce a stale-looking grid cell, never an actual double-booking.
+// One-time bookings don't get a 'booked' row — they're date-specific, not
+// part of the *weekly* pattern this row exists to represent, and are already
+// visible via the Upcoming Lessons panels.
 export interface AvailabilityException {
   id: string
   tutorUserId: string
-  startDate: string         // ISO date — first day of the blocked range
-  endDate: string           // ISO date — last day of the blocked range (same as startDate for single-day blocks)
-  type: 'blocked' | 'modified'
-  startTime: string         // HH:MM, only when type='modified'; else ''
-  endTime: string           // HH:MM, only when type='modified'; else ''
+  startDate: string         // ISO date — first day of the blocked range; for 'booked', the booking's anchor date
+  endDate: string           // ISO date — last day of the blocked range (same as startDate for single-day blocks); for 'booked', same as startDate (the real recurrence end is `endsDate` below)
+  type: 'blocked' | 'modified' | 'booked'
+  startTime: string         // HH:MM, only when type='modified'|'booked'; else ''
+  endTime: string           // HH:MM, only when type='modified'|'booked'; else ''
   createdAt: string
+  // Only set when type='booked' — the recurrence rule mirrors the owning
+  // LessonRequest's own shape exactly. Blank/0 for 'blocked'|'modified' rows.
+  repeatType: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | ''
+  repeatInterval: number
+  repeatDays: string[]
+  endsType: 'never' | 'on' | 'after' | ''
+  endsDate: string          // ISO date, only when endsType='on'; else ''
+  endsAfterCount: number    // only when endsType='after'; else 0
+  // Only set when type='booked' — the LessonRequest this row mirrors. Lets
+  // an edit/cancel find-and-update/delete the right row. '' for manual rows.
+  sourceLessonRequestId: string
 }
 
 // A LessonRequest is the booking/series: status describes the booking

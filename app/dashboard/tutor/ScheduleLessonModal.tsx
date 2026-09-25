@@ -24,7 +24,10 @@ function TimePicker({ label, value, onChange }: {
   const lastCommittedRef = useRef(mStr)
 
   useEffect(() => {
-    if (mStr !== lastCommittedRef.current) setMDisplay(mStr)
+    if (mStr !== lastCommittedRef.current) {
+      setMDisplay(mStr)
+      lastCommittedRef.current = mStr
+    }
   }, [mStr])
 
   const commit = (nh12: number, nm: string, nAmpm: string) => {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createLessonRequest, getTutorByUserId } from '@/lib/sheets'
+import { findSchedulingConflict } from '@/lib/availability'
+import { formatTime } from '@/lib/schedule'
 import { sendEmail, lessonRequestEmailHtml } from '@/lib/email'
 import type { LessonRequest } from '@/lib/types'
 import { randomUUID } from 'crypto'
@@ -33,6 +35,17 @@ export async function POST(request: NextRequest) {
 
   const tutor = await getTutorByUserId(tutorUserId)
   if (!tutor) return NextResponse.json({ error: 'Tutor not found.' }, { status: 404 })
+
+  const conflict = await findSchedulingConflict(tutorUserId, {
+    requestedDate, requestedStartTime, requestedEndTime,
+    repeatType, repeatInterval, repeatDays, endsType, endsDate, endsAfterCount,
+  })
+  if (conflict) {
+    return NextResponse.json(
+      { error: `That time isn't available — conflicts with the tutor's schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+      { status: 409 },
+    )
+  }
 
   const req: LessonRequest = {
     id: `req_${randomUUID().replace(/-/g, '').slice(0, 12)}`,

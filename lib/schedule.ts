@@ -312,9 +312,13 @@ export function describeRule(rule: TutorAvailabilityRule): string {
 }
 
 // Expand a booking's own recurrence into concrete occurrences within
-// [from, to], anchored on its requestedDate (its first occurrence).
+// [from, to], anchored on its requestedDate (its first occurrence). Pick<>
+// (not the full LessonRequest) so a candidate that isn't a real booking yet
+// — e.g. findSchedulingConflict's write-time conflict check — can reuse this
+// without needing the rest of LessonRequest's fields.
 export function expandLessonRequestOccurrences(
-  booking: LessonRequest,
+  booking: Pick<LessonRequest, 'requestedDate' | 'requestedStartTime' | 'requestedEndTime'
+    | 'repeatType' | 'repeatInterval' | 'repeatDays' | 'endsType' | 'endsDate' | 'endsAfterCount'>,
   from: Date,
   to: Date,
 ): Array<{ date: string; startTime: string; endTime: string }> {

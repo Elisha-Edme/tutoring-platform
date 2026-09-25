@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAvailabilityRulesByTutor, getExceptionsByTutor, getLessonRequestsByTutor, getOccurrencesByTutor } from '@/lib/sheets'
-import { getAvailableWindows, getBookedIntervals } from '@/lib/schedule'
+import { computeTutorAvailableWindows } from '@/lib/availability'
 
 // Public — no auth required. Returns raw availability windows (not subdivided)
 // so the booking UI can show what hours the tutor is free each day.
@@ -28,24 +27,9 @@ export async function GET(
   // When re-checking availability for an existing booking (e.g. a parent
   // rescheduling it), exclude that booking's own occupied slots — otherwise
   // its own recurrence would make its usual day/time look unavailable.
-  const excludeLessonRequestId = searchParams.get('excludeLessonRequestId')
+  const excludeLessonRequestId = searchParams.get('excludeLessonRequestId') ?? undefined
 
-  const [rules, exceptions] = await Promise.all([
-    getAvailabilityRulesByTutor(tutorUserId),
-    getExceptionsByTutor(tutorUserId),
-  ])
-
-  let booked: Array<{ date: string; startTime: string; endTime: string }> = []
-  if (excludeBooked) {
-    const [requests, occurrences] = await Promise.all([
-      getLessonRequestsByTutor(tutorUserId),
-      getOccurrencesByTutor(tutorUserId),
-    ])
-    const activeBookings = requests.filter(r => r.status === 'in_progress' && r.id !== excludeLessonRequestId)
-    booked = getBookedIntervals(activeBookings, occurrences, from, to)
-  }
-
-  const windows = getAvailableWindows(rules, exceptions, from, to, booked)
+  const windows = await computeTutorAvailableWindows(tutorUserId, from, to, { excludeBooked, excludeLessonRequestId })
 
   // Group by date for easy lookup in the UI.
   const byDate: Record<string, { startTime: string; endTime: string }[]> = {}

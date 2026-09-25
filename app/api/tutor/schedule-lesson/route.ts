@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createLessonRequest, getParentProfile, getTutorStudentsByTutor } from '@/lib/sheets'
-import { describeLessonRecurrence } from '@/lib/schedule'
+import { describeLessonRecurrence, formatTime } from '@/lib/schedule'
+import { findSchedulingConflict } from '@/lib/availability'
 import { sendEmail, lessonScheduledEmailHtml } from '@/lib/email'
 import { materializeFirstOccurrence } from '@/lib/booking-completion'
 import type { LessonRequest } from '@/lib/types'
@@ -63,6 +64,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'You don’t have an approved relationship with that student yet.' },
       { status: 403 },
+    )
+  }
+
+  const conflict = await findSchedulingConflict(session.userId, {
+    requestedDate, requestedStartTime, requestedEndTime,
+    repeatType, repeatInterval, repeatDays, endsType, endsDate, endsAfterCount,
+  })
+  if (conflict) {
+    return NextResponse.json(
+      { error: `That conflicts with your own schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+      { status: 409 },
     )
   }
 

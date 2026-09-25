@@ -99,7 +99,7 @@ export default function TutorProfilePanel() {
     setInstrDraft(prev => (prev.includes(inst) ? prev.filter(x => x !== inst) : [...prev, inst]))
 
   if (loading) return <p className="text-gray-400 text-sm">Loading your profile…</p>
-  if (!tutor) return <p className="text-gray-400 text-sm">Couldn't load your profile. Please refresh.</p>
+  if (!tutor) return <p className="text-gray-400 text-sm">Couldn&rsquo;t load your profile. Please refresh.</p>
 
   const sectionTitle = 'text-sm font-semibold text-gray-700 uppercase tracking-wide'
 
