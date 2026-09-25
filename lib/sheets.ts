@@ -1,7 +1,8 @@
 import { google } from 'googleapis'
 import type {
   User, TutorProfile, ParentProfile, Child,
-  TutorAvailabilityRule, AvailabilityException, LessonRequest, TutorStudent,
+  TutorAvailabilityRule, AvailabilityException, LessonRequest, TutorStudent, Review,
+  LessonOccurrence,
 } from './types'
 
 function getPrivateKey(): string {
@@ -22,29 +23,85 @@ function getAuth() {
   })
 }
 
+// Reused across calls within the same warm server instance — building a new
+// GoogleAuth/JWT client per call forces a fresh OAuth token fetch every time,
+// which adds latency and load for no benefit (the client itself is stateless
+// per spreadsheet/request).
+let sheetsClient: ReturnType<typeof google.sheets> | null = null
 async function getSheets() {
-  const auth = getAuth()
-  return google.sheets({ version: 'v4', auth })
+  if (!sheetsClient) sheetsClient = google.sheets({ version: 'v4', auth: getAuth() })
+  return sheetsClient
 }
 
 const SHEET_ID = () => process.env.GOOGLE_SHEET_ID!
 
+// Coalesces truly concurrent reads of the same tab into one API call — e.g. a
+// dashboard whose several panels each independently fetch and happen to both
+// need LessonRequests at the same moment. Not a cache: nothing lingers after
+// the read resolves, so this can never serve stale data, only avoid a
+// redundant simultaneous one. This is the main lever against Google Sheets'
+// "Read requests per minute per user" quota (default 60/min) — a page with
+// several panels can otherwise easily fire a dozen+ near-simultaneous reads.
+const inFlightReads = new Map<string, Promise<string[][]>>()
+
 // Row 1 of every tab is a human-readable header, so data starts at row 2.
 async function getDataRows(tab: string): Promise<string[][]> {
+  const existing = inFlightReads.get(tab)
+  if (existing) return existing
+
+  const promise = (async () => {
+    const sheets = await getSheets()
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID(),
+      range: `${tab}!A2:Z`,
+    })
+    return (res.data.values as string[][] | null | undefined) ?? []
+  })()
+
+  inFlightReads.set(tab, promise)
+  try {
+    return await promise
+  } finally {
+    inFlightReads.delete(tab)
+  }
+}
+
+// 1-indexed column number -> letter (e.g. 1 -> 'A', 17 -> 'Q'). Every tab in
+// this app has well under 26 columns, so a single letter always suffices.
+function columnLetter(n: number): string {
+  return String.fromCharCode(64 + n)
+}
+
+// `values.append` finds its target by scanning for a contiguous non-empty
+// block of rows and aligning new data to THAT block's existing column shape —
+// it doesn't just write at column A of the requested range. Once any one row
+// in a tab ends up misaligned (e.g. from a past bug, or a gap breaking the
+// "contiguous" scan), every future append inherits the same misalignment,
+// silently shifting real data into the wrong columns. `insertDataOption:
+// 'INSERT_ROWS'` doesn't fix this — it only changes shift-vs-overwrite below
+// the detected block, not the column it anchors to. Reading the current row
+// count and writing with `values.update` on a fully-specified range sidesteps
+// that detection entirely: it's a plain write to an exact address, so there's
+// nothing left to misdetect. A wide read range (well past any historical
+// corruption) keeps the row count accurate.
+async function getNextRowNumber(tab: string): Promise<number> {
   const sheets = await getSheets()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID(),
-    range: `${tab}!A2:Z`,
+    range: `${tab}!A2:ZZ`,
   })
-  return (res.data.values as string[][] | null | undefined) ?? []
+  const rows = (res.data.values as string[][] | null | undefined) ?? []
+  return rows.length + 2
 }
 
 async function appendRows(tab: string, rows: string[][]): Promise<void> {
   if (rows.length === 0) return
   const sheets = await getSheets()
-  await sheets.spreadsheets.values.append({
+  const lastCol = columnLetter(rows[0].length)
+  const startRow = await getNextRowNumber(tab)
+  await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID(),
-    range: `${tab}!A:Z`,
+    range: `${tab}!A${startRow}:${lastCol}${startRow + rows.length - 1}`,
     valueInputOption: 'RAW',
     requestBody: { values: rows },
   })
@@ -303,7 +360,9 @@ export async function deleteAvailabilityException(id: string): Promise<void> {
 
 // ── LessonRequests ─────────────────────────────────────────────────────────────
 // Columns: id, parentUserId, childName, tutorUserId,
-//          requestedDate, requestedStartTime, requestedEndTime, message, status, createdAt, updatedAt
+//          requestedDate, requestedStartTime, requestedEndTime, message, status, createdAt, updatedAt,
+//          repeatType, repeatInterval, repeatDays, endsType, endsDate, endsAfterCount, initiatedBy,
+//          acceptedAt, declineReason
 
 function rowToLessonRequest(row: string[]): LessonRequest {
   return {
@@ -318,6 +377,19 @@ function rowToLessonRequest(row: string[]): LessonRequest {
     status: (row[8] ?? 'pending') as LessonRequest['status'],
     createdAt: row[9] ?? '',
     updatedAt: row[10] ?? '',
+    repeatType: (row[11] || 'once') as LessonRequest['repeatType'],
+    repeatInterval: parseInt(row[12] || '1', 10),
+    repeatDays: row[13] ? row[13].split(',').map(s => s.trim()) : [],
+    endsType: (row[14] || 'never') as LessonRequest['endsType'],
+    endsDate: row[15] ?? '',
+    endsAfterCount: parseInt(row[16] || '0', 10),
+    // Every legacy pending row came from the parent-only request route (the
+    // pre-redesign tutor-schedule route always wrote 'in_progress' directly,
+    // never 'pending'), so defaulting a blank cell to 'parent' never
+    // mislabels a row in a way that matters — see isAwaitingParentApproval.
+    initiatedBy: (row[17] || 'parent') as LessonRequest['initiatedBy'],
+    acceptedAt: row[18] ?? '',
+    declineReason: row[19] ?? '',
   }
 }
 
@@ -327,6 +399,9 @@ function lessonRequestToRow(r: LessonRequest): string[] {
     r.tutorUserId,
     r.requestedDate, r.requestedStartTime, r.requestedEndTime,
     r.message, r.status, r.createdAt, r.updatedAt,
+    r.repeatType, String(r.repeatInterval), r.repeatDays.join(','),
+    r.endsType, r.endsDate ?? '', String(r.endsAfterCount ?? 0),
+    r.initiatedBy, r.acceptedAt, r.declineReason,
   ]
 }
 
@@ -344,29 +419,45 @@ export async function getLessonRequestsByParent(parentUserId: string): Promise<L
   return rows.filter(r => r[1] === parentUserId).map(rowToLessonRequest)
 }
 
-export async function updateLessonRequestStatus(
+export async function getAllLessonRequests(): Promise<LessonRequest[]> {
+  const rows = await getDataRows('LessonRequests')
+  return rows.map(rowToLessonRequest)
+}
+
+export async function getLessonRequestById(id: string): Promise<LessonRequest | null> {
+  const rows = await getDataRows('LessonRequests')
+  const row = rows.find(r => r[0] === id)
+  return row ? rowToLessonRequest(row) : null
+}
+
+export async function updateLessonRequest(
   id: string,
-  status: LessonRequest['status'],
-): Promise<boolean> {
+  patch: Partial<LessonRequest>,
+): Promise<LessonRequest | null> {
   const rows = await getDataRows('LessonRequests')
   const i = rows.findIndex(r => r[0] === id)
-  if (i === -1) return false
-  const updated = rowToLessonRequest(rows[i])
-  updated.status = status
-  updated.updatedAt = new Date().toISOString()
+  if (i === -1) return null
+  const updated: LessonRequest = {
+    ...rowToLessonRequest(rows[i]),
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  }
   const sheets = await getSheets()
   const rowNum = i + 2
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID(),
-    range: `LessonRequests!A${rowNum}:K${rowNum}`,
+    range: `LessonRequests!A${rowNum}:T${rowNum}`,
     valueInputOption: 'RAW',
     requestBody: { values: [lessonRequestToRow(updated)] },
   })
-  return true
+  return updated
 }
 
 // ── TutorStudents ─────────────────────────────────────────────────────────────
-// Columns: tutorUserId, parentUserId, childName, addedAt
+// Columns: tutorUserId, parentUserId, childName, addedAt, id, status,
+//          proposedLessonDate, proposedLessonStartTime, proposedLessonEndTime,
+//          proposedRepeatType, proposedRepeatInterval, proposedRepeatDays,
+//          proposedEndsType, proposedEndsDate, proposedEndsAfterCount
 
 function rowToTutorStudent(row: string[]): TutorStudent {
   return {
@@ -374,7 +465,30 @@ function rowToTutorStudent(row: string[]): TutorStudent {
     parentUserId: row[1],
     childName: row[2] ?? '',
     addedAt: row[3] ?? '',
+    id: row[4] ?? '',
+    // Rows created before this approval flow existed have no status cell —
+    // grandfather them in as already-approved rather than requiring a
+    // backfill write to the live sheet.
+    status: (row[5] || 'approved') as TutorStudent['status'],
+    proposedLessonDate: row[6] ?? '',
+    proposedLessonStartTime: row[7] ?? '',
+    proposedLessonEndTime: row[8] ?? '',
+    proposedRepeatType: (row[9] || 'once') as TutorStudent['proposedRepeatType'],
+    proposedRepeatInterval: parseInt(row[10] || '1', 10),
+    proposedRepeatDays: row[11] ? row[11].split(',').map(s => s.trim()) : [],
+    proposedEndsType: (row[12] || 'never') as TutorStudent['proposedEndsType'],
+    proposedEndsDate: row[13] ?? '',
+    proposedEndsAfterCount: parseInt(row[14] || '0', 10),
   }
+}
+
+function tutorStudentToRow(ts: TutorStudent): string[] {
+  return [
+    ts.tutorUserId, ts.parentUserId, ts.childName, ts.addedAt,
+    ts.id, ts.status, ts.proposedLessonDate, ts.proposedLessonStartTime, ts.proposedLessonEndTime,
+    ts.proposedRepeatType, String(ts.proposedRepeatInterval), ts.proposedRepeatDays.join(','),
+    ts.proposedEndsType, ts.proposedEndsDate ?? '', String(ts.proposedEndsAfterCount ?? 0),
+  ]
 }
 
 export async function getTutorStudentsByTutor(tutorUserId: string): Promise<TutorStudent[]> {
@@ -382,8 +496,38 @@ export async function getTutorStudentsByTutor(tutorUserId: string): Promise<Tuto
   return rows.filter(r => r[0] === tutorUserId).map(rowToTutorStudent)
 }
 
+export async function getTutorStudentsByParent(parentUserId: string): Promise<TutorStudent[]> {
+  const rows = await getDataRows('TutorStudents')
+  return rows.filter(r => r[1] === parentUserId).map(rowToTutorStudent)
+}
+
+export async function getTutorStudentById(id: string): Promise<TutorStudent | null> {
+  const rows = await getDataRows('TutorStudents')
+  const row = rows.find(r => r[4] === id)
+  return row ? rowToTutorStudent(row) : null
+}
+
 export async function createTutorStudent(ts: TutorStudent): Promise<void> {
-  await appendRow('TutorStudents', [ts.tutorUserId, ts.parentUserId, ts.childName, ts.addedAt])
+  await appendRow('TutorStudents', tutorStudentToRow(ts))
+}
+
+export async function updateTutorStudent(
+  id: string,
+  patch: Partial<TutorStudent>,
+): Promise<TutorStudent | null> {
+  const rows = await getDataRows('TutorStudents')
+  const i = rows.findIndex(r => r[4] === id)
+  if (i === -1) return null
+  const updated: TutorStudent = { ...rowToTutorStudent(rows[i]), ...patch }
+  const sheets = await getSheets()
+  const rowNum = i + 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID(),
+    range: `TutorStudents!A${rowNum}:O${rowNum}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [tutorStudentToRow(updated)] },
+  })
+  return updated
 }
 
 export async function deleteTutorStudent(
@@ -410,6 +554,139 @@ export async function deleteTutorStudent(
       })),
     },
   })
+}
+
+// ── Lessons (per-occurrence tracking, TS type is still called LessonOccurrence) ─
+// Columns: id, lessonRequestId, tutorUserId, parentUserId, occurrenceDate,
+//          occurrenceStartTime, occurrenceEndTime, status, completedAt, summary,
+//          reminder10SentAt, reminder60SentAt, createdAt, reminder24hSentAt, reminder1hSentAt,
+//          proposedDate, proposedStartTime, proposedEndTime, proposedBy, rescheduledDate
+// A row exists once there's something to track about an occurrence: its first
+// pre-lesson reminder ('upcoming'), a pending/applied reschedule, or a
+// terminal outcome ('completed'/'cancelled'/'no_show'). See lib/lessons.ts's
+// isTerminalOccurrence().
+
+function rowToLessonOccurrence(row: string[]): LessonOccurrence {
+  return {
+    id: row[0],
+    lessonRequestId: row[1],
+    tutorUserId: row[2],
+    parentUserId: row[3],
+    occurrenceDate: row[4] ?? '',
+    occurrenceStartTime: row[5] ?? '',
+    occurrenceEndTime: row[6] ?? '',
+    status: (row[7] ?? 'completed') as LessonOccurrence['status'],
+    completedAt: row[8] ?? '',
+    summary: row[9] ?? '',
+    reminder10SentAt: row[10] ?? '',
+    reminder60SentAt: row[11] ?? '',
+    createdAt: row[12] ?? '',
+    reminder24hSentAt: row[13] ?? '',
+    reminder1hSentAt: row[14] ?? '',
+    proposedDate: row[15] ?? '',
+    proposedStartTime: row[16] ?? '',
+    proposedEndTime: row[17] ?? '',
+    proposedBy: (row[18] || '') as LessonOccurrence['proposedBy'],
+    rescheduledDate: row[19] ?? '',
+  }
+}
+
+function lessonOccurrenceToRow(o: LessonOccurrence): string[] {
+  return [
+    o.id, o.lessonRequestId, o.tutorUserId, o.parentUserId,
+    o.occurrenceDate, o.occurrenceStartTime, o.occurrenceEndTime,
+    o.status, o.completedAt, o.summary, o.reminder10SentAt, o.reminder60SentAt, o.createdAt,
+    o.reminder24hSentAt, o.reminder1hSentAt,
+    o.proposedDate, o.proposedStartTime, o.proposedEndTime, o.proposedBy, o.rescheduledDate,
+  ]
+}
+
+export async function createLessonOccurrence(occ: LessonOccurrence): Promise<void> {
+  await appendRow('Lessons', lessonOccurrenceToRow(occ))
+}
+
+export async function getAllOccurrences(): Promise<LessonOccurrence[]> {
+  const rows = await getDataRows('Lessons')
+  return rows.map(rowToLessonOccurrence)
+}
+
+export async function getOccurrencesByLessonRequest(lessonRequestId: string): Promise<LessonOccurrence[]> {
+  const rows = await getDataRows('Lessons')
+  return rows.filter(r => r[1] === lessonRequestId).map(rowToLessonOccurrence)
+}
+
+export async function getOccurrencesByTutor(tutorUserId: string): Promise<LessonOccurrence[]> {
+  const rows = await getDataRows('Lessons')
+  return rows.filter(r => r[2] === tutorUserId).map(rowToLessonOccurrence)
+}
+
+export async function getOccurrencesByParent(parentUserId: string): Promise<LessonOccurrence[]> {
+  const rows = await getDataRows('Lessons')
+  return rows.filter(r => r[3] === parentUserId).map(rowToLessonOccurrence)
+}
+
+export async function updateLessonOccurrence(
+  id: string,
+  patch: Partial<LessonOccurrence>,
+): Promise<LessonOccurrence | null> {
+  const rows = await getDataRows('Lessons')
+  const i = rows.findIndex(r => r[0] === id)
+  if (i === -1) return null
+  const updated = { ...rowToLessonOccurrence(rows[i]), ...patch }
+  const sheets = await getSheets()
+  const r = i + 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID(),
+    range: `Lessons!A${r}:T${r}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [lessonOccurrenceToRow(updated)] },
+  })
+  return updated
+}
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+// Columns: id, tutorUserId, parentUserId, rating, comment, createdAt
+// One review per (tutorUserId, parentUserId) pair — a review is of the tutor's
+// teaching overall, not of any single lesson occurrence.
+
+function rowToReview(row: string[]): Review {
+  return {
+    id: row[0],
+    tutorUserId: row[1],
+    parentUserId: row[2],
+    rating: parseInt(row[3] ?? '0', 10),
+    comment: row[4] ?? '',
+    createdAt: row[5] ?? '',
+  }
+}
+
+function reviewToRow(r: Review): string[] {
+  return [r.id, r.tutorUserId, r.parentUserId, String(r.rating), r.comment, r.createdAt]
+}
+
+export async function createReview(review: Review): Promise<void> {
+  await appendRow('Reviews', reviewToRow(review))
+}
+
+export async function getAllReviews(): Promise<Review[]> {
+  const rows = await getDataRows('Reviews')
+  return rows.map(rowToReview)
+}
+
+export async function getReviewsByTutor(tutorUserId: string): Promise<Review[]> {
+  const rows = await getDataRows('Reviews')
+  return rows.filter(r => r[1] === tutorUserId).map(rowToReview)
+}
+
+export async function getReviewsByParent(parentUserId: string): Promise<Review[]> {
+  const rows = await getDataRows('Reviews')
+  return rows.filter(r => r[2] === parentUserId).map(rowToReview)
+}
+
+export async function getReviewByTutorAndParent(tutorUserId: string, parentUserId: string): Promise<Review | null> {
+  const rows = await getDataRows('Reviews')
+  const row = rows.find(r => r[1] === tutorUserId && r[2] === parentUserId)
+  return row ? rowToReview(row) : null
 }
 
 // One-time migration: overwrite the passwordHash column (E) for every tutor row

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAvailabilityRulesByTutor, getExceptionsByTutor } from '@/lib/sheets'
-import { getAvailableWindows } from '@/lib/schedule'
+import { getAvailabilityRulesByTutor, getExceptionsByTutor, getLessonRequestsByTutor, getOccurrencesByTutor } from '@/lib/sheets'
+import { getAvailableWindows, getBookedIntervals } from '@/lib/schedule'
 
 // Public — no auth required. Returns raw availability windows (not subdivided)
 // so the booking UI can show what hours the tutor is free each day.
@@ -21,12 +21,31 @@ export async function GET(
     ? new Date(`${toStr}T23:59:59`)
     : new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
 
+  // Defaults to true so the booking-critical path is correct without having
+  // to remember to opt in — TutorAvailabilityPreview explicitly opts out
+  // since it's a general weekly-shape preview, not a literal calendar.
+  const excludeBooked = searchParams.get('excludeBooked') !== 'false'
+  // When re-checking availability for an existing booking (e.g. a parent
+  // rescheduling it), exclude that booking's own occupied slots — otherwise
+  // its own recurrence would make its usual day/time look unavailable.
+  const excludeLessonRequestId = searchParams.get('excludeLessonRequestId')
+
   const [rules, exceptions] = await Promise.all([
     getAvailabilityRulesByTutor(tutorUserId),
     getExceptionsByTutor(tutorUserId),
   ])
 
-  const windows = getAvailableWindows(rules, exceptions, from, to)
+  let booked: Array<{ date: string; startTime: string; endTime: string }> = []
+  if (excludeBooked) {
+    const [requests, occurrences] = await Promise.all([
+      getLessonRequestsByTutor(tutorUserId),
+      getOccurrencesByTutor(tutorUserId),
+    ])
+    const activeBookings = requests.filter(r => r.status === 'in_progress' && r.id !== excludeLessonRequestId)
+    booked = getBookedIntervals(activeBookings, occurrences, from, to)
+  }
+
+  const windows = getAvailableWindows(rules, exceptions, from, to, booked)
 
   // Group by date for easy lookup in the UI.
   const byDate: Record<string, { startTime: string; endTime: string }[]> = {}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { TutorAvailabilityRule } from '@/lib/types'
 import { formatTime } from '@/lib/schedule'
 
@@ -72,14 +72,22 @@ function InlineTimePicker({ value, onChange }: { value: string; onChange: (v: st
   const h12 = h % 12 || 12
 
   const [mDisplay, setMDisplay] = useState(mStr)
-  // Keep mDisplay in sync when the value changes from outside (e.g. hour/AM-PM change)
-  useEffect(() => { setMDisplay(mStr) }, [mStr])
+  // Tracks the last padded minute value WE pushed out via commit, so the
+  // resync effect below can tell "my own round-trip coming back" apart from
+  // "a genuine external change" (switching the hour or AM/PM).
+  const lastCommittedRef = useRef(mStr)
+
+  useEffect(() => {
+    if (mStr !== lastCommittedRef.current) setMDisplay(mStr)
+  }, [mStr])
 
   const commit = (nh12: number, nm: string, nAmpm: string) => {
     let h24 = nh12 % 12
     if (nAmpm === 'PM') h24 += 12
     const m = Math.min(59, Math.max(0, parseInt(nm, 10) || 0))
-    onChange(`${pad2(h24)}:${pad2(m)}`)
+    const padded = pad2(m)
+    lastCommittedRef.current = padded
+    onChange(`${pad2(h24)}:${padded}`)
   }
 
   const cls = 'border border-gray-200 rounded text-xs py-0.5 bg-white focus:outline-none focus:border-gray-400'

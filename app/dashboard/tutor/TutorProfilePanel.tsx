@@ -1,12 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type { TutorProfile } from '@/lib/types'
-import { TUTOR_INSTRUMENTS } from '@/lib/constants'
+import { useState, useEffect, useRef } from 'react'
+import { upload } from '@vercel/blob/client'
+import type { TutorProfileWithStats } from '@/lib/types'
+import { TUTOR_INSTRUMENTS, MAX_PHOTO_SIZE_BYTES } from '@/lib/constants'
 import { toDisplayImageUrl } from '@/lib/images'
+import { formatHours } from '@/lib/lessons'
 import AvailabilityEditor from './AvailabilityEditor'
 import LessonRequestsPanel from './LessonRequestsPanel'
 import MyStudentsPanel from './MyStudentsPanel'
+import ReviewsPanel from './ReviewsPanel'
+import PastLessonsPanel from './PastLessonsPanel'
+import UpcomingLessonsPanel from './UpcomingLessonsPanel'
+import ScheduleLessonModal from './ScheduleLessonModal'
+import StarRating from '@/components/StarRating'
 
 function Avatar({ name, url }: { name: string; url: string }) {
   const [failed, setFailed] = useState(false)
@@ -22,7 +29,7 @@ function Avatar({ name, url }: { name: string; url: string }) {
 }
 
 export default function TutorProfilePanel() {
-  const [tutor, setTutor] = useState<TutorProfile | null>(null)
+  const [tutor, setTutor] = useState<TutorProfileWithStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [editingBio, setEditingBio] = useState(false)
@@ -33,6 +40,9 @@ export default function TutorProfilePanel() {
   const [pendingCount, setPendingCount] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
 
   useEffect(() => {
     fetch('/api/tutor/me')
@@ -42,7 +52,7 @@ export default function TutorProfilePanel() {
       .finally(() => setLoading(false))
   }, [])
 
-  const save = async (patch: { bio?: string; instruments?: string[] }) => {
+  const save = async (patch: { bio?: string; instruments?: string[]; photoUrl?: string }) => {
     setSaving(true)
     setError('')
     const res = await fetch('/api/tutor/me', {
@@ -62,6 +72,29 @@ export default function TutorProfilePanel() {
     setSaving(false)
   }
 
+  const handlePhotoSelect = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      setError(`Photo must be under ${Math.round(MAX_PHOTO_SIZE_BYTES / 1024 / 1024)}MB.`)
+      return
+    }
+    setUploadingPhoto(true)
+    setError('')
+    try {
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/tutor/photo/upload',
+      })
+      await save({ photoUrl: blob.url })
+    } catch {
+      setError('Failed to upload photo. Please try again.')
+    }
+    setUploadingPhoto(false)
+  }
+
   const toggleInstrument = (inst: string) =>
     setInstrDraft(prev => (prev.includes(inst) ? prev.filter(x => x !== inst) : [...prev, inst]))
 
@@ -74,11 +107,38 @@ export default function TutorProfilePanel() {
     <div className="space-y-10">
       {/* Profile header */}
       <section className="flex items-center gap-4">
-        <Avatar name={tutor.name} url={tutor.photoUrl} />
+        <div className="relative">
+          <Avatar name={tutor.name} url={tutor.photoUrl} />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-gray-700 transition disabled:opacity-50"
+            aria-label="Change photo"
+            title="Change photo"
+          >
+            {uploadingPhoto ? '…' : '✎'}
+          </button>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) handlePhotoSelect(file)
+              e.target.value = ''
+            }}
+          />
+        </div>
         <div>
           <p className="text-lg font-semibold text-gray-900">{tutor.name}</p>
           <p className="text-sm text-gray-500">{tutor.instruments.join(', ') || 'No instruments yet'}</p>
           {tutor.credentials && <p className="text-xs text-gray-400 mt-1">{tutor.credentials}</p>}
+          <p className="text-xs text-gray-500 mt-1.5">
+            {tutor.lessonsCompleted} lessons · {formatHours(tutor.hoursCompleted)} hrs ·{' '}
+            <StarRating rating={tutor.rating} reviewCount={tutor.reviewCount} />
+          </p>
         </div>
       </section>
 
@@ -170,6 +230,24 @@ export default function TutorProfilePanel() {
         <AvailabilityEditor />
       </section>
 
+      {/* Schedule a lesson */}
+      <section>
+        <h2 className={`${sectionTitle} mb-3`}>Schedule a lesson</h2>
+        <button
+          type="button"
+          onClick={() => setShowScheduleModal(true)}
+          className="bg-gray-900 text-white text-sm px-4 py-2 rounded-md hover:bg-gray-700 transition"
+        >
+          + Schedule a lesson
+        </button>
+      </section>
+
+      {/* Upcoming Lessons */}
+      <section>
+        <h2 className={`${sectionTitle} mb-3`}>Upcoming Lessons</h2>
+        <UpcomingLessonsPanel />
+      </section>
+
       {/* Lesson requests */}
       <section>
         <div className="flex items-center gap-3 mb-3">
@@ -183,11 +261,30 @@ export default function TutorProfilePanel() {
         <LessonRequestsPanel onPendingCountChange={setPendingCount} />
       </section>
 
+      {/* Past lessons */}
+      <section>
+        <h2 className={`${sectionTitle} mb-3`}>Past Lessons</h2>
+        <PastLessonsPanel />
+      </section>
+
+      {/* Reviews */}
+      <section>
+        <h2 className={`${sectionTitle} mb-3`}>Reviews</h2>
+        <ReviewsPanel />
+      </section>
+
       {/* My students */}
       <section>
         <h2 className={`${sectionTitle} mb-3`}>My students</h2>
         <MyStudentsPanel />
       </section>
+
+      {showScheduleModal && (
+        <ScheduleLessonModal
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => {}}
+        />
+      )}
     </div>
   )
 }
