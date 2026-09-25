@@ -7,6 +7,9 @@ export const DEFAULT_TUTOR_PASSWORD = 'TuneUp123'
 export const DEFAULT_AVATAR_URL =
   'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y&s=256'
 
+// Cap on a tutor's uploaded profile photo (Vercel Blob).
+export const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
+
 // Shared options for the child forms (signup + parent dashboard "manage children").
 export const GRADES = ['K', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th']
 

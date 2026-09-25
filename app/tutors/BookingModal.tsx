@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Child } from '@/lib/types'
-import { formatTime } from '@/lib/schedule'
+import { formatTime, addMinutesToTime, isRangeWithinWindows } from '@/lib/schedule'
+import { lessonDurationHours } from '@/lib/lessons'
+import BookingCalendarView from './BookingCalendarView'
+
+const DEFAULT_LESSON_MINUTES = 45
 
 // ── Time picker ────────────────────────────────────────────────────────────────
 
@@ -18,14 +22,22 @@ function TimePicker({ label, value, onChange }: {
   const ampm = h >= 12 ? 'PM' : 'AM'
   const h12 = h % 12 || 12
   const [mDisplay, setMDisplay] = useState(mStr)
+  // Tracks the last padded minute value WE pushed out via commit, so the
+  // resync effect below can tell "my own round-trip coming back" apart from
+  // "a genuine external change" (switching the hour or AM/PM).
+  const lastCommittedRef = useRef(mStr)
 
-  useEffect(() => { setMDisplay(mStr) }, [mStr])
+  useEffect(() => {
+    if (mStr !== lastCommittedRef.current) setMDisplay(mStr)
+  }, [mStr])
 
   const commit = (nh12: number, nm: string, nAmpm: string) => {
     let h24 = nh12 % 12
     if (nAmpm === 'PM') h24 += 12
     const m = Math.min(59, Math.max(0, parseInt(nm, 10) || 0))
-    onChange(`${pad2(h24)}:${pad2(m)}`)
+    const padded = pad2(m)
+    lastCommittedRef.current = padded
+    onChange(`${pad2(h24)}:${padded}`)
   }
 
   const sel = 'border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-gray-500 text-center'
@@ -101,6 +113,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
   const [endTime, setEndTime] = useState('10:00')
   const [selectedChild, setSelectedChild] = useState('')
   const [message, setMessage] = useState('')
+  const [dateView, setDateView] = useState<'list' | 'calendar'>('list')
 
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -128,17 +141,25 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
 
   const availableDates = Object.keys(windows).sort()
 
-  // When a date is picked, seed the time pickers from the first window.
+  // When a date is picked, default to a 45-minute lesson (or the tutor's
+  // whole window that day, if it's shorter than 45 min) starting at the
+  // earliest time the tutor is free — not the entire available window.
   const handleDateSelect = (date: string) => {
     setSelectedDate(date)
     const wins = windows[date]
     if (wins?.length) {
-      setStartTime(wins[0].startTime)
-      setEndTime(wins[0].endTime)
+      const first = wins[0]
+      const windowMinutes = lessonDurationHours(first.startTime, first.endTime) * 60
+      const durationMinutes = Math.min(DEFAULT_LESSON_MINUTES, windowMinutes)
+      setStartTime(first.startTime)
+      setEndTime(addMinutesToTime(first.startTime, durationMinutes))
     }
   }
 
-  const timesValid = startTime < endTime
+  const dayWindows = selectedDate ? (windows[selectedDate] ?? []) : []
+  const endAfterStart = startTime < endTime
+  const withinTutorWindow = isRangeWithinWindows(startTime, endTime, dayWindows)
+  const timesValid = endAfterStart && withinTutorWindow
 
   const handleSubmit = async () => {
     if (!selectedDate || !timesValid || !selectedChild) {
@@ -207,23 +228,45 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
               <>
                 {/* Step 1 — date */}
                 <div className="mb-5">
-                  <p className="text-sm font-medium text-gray-700 mb-2">1. Pick a date</p>
-                  <div className="flex flex-wrap gap-2">
-                    {availableDates.map(date => (
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-700">1. Pick a date</p>
+                    <div className="flex gap-1">
                       <button
-                        key={date}
                         type="button"
-                        onClick={() => handleDateSelect(date)}
-                        className={`px-3 py-1.5 rounded-lg text-sm border transition ${
-                          selectedDate === date
-                            ? 'bg-gray-900 text-white border-gray-900'
-                            : 'border-gray-200 text-gray-700 hover:border-gray-400'
-                        }`}
+                        onClick={() => setDateView('list')}
+                        className={`text-xs px-2 py-1 rounded-full transition ${dateView === 'list' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'}`}
                       >
-                        {formatDateChip(date)}
+                        List
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setDateView('calendar')}
+                        className={`text-xs px-2 py-1 rounded-full transition ${dateView === 'calendar' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'}`}
+                      >
+                        Calendar
+                      </button>
+                    </div>
                   </div>
+                  {dateView === 'list' ? (
+                    <div className="flex flex-wrap gap-2">
+                      {availableDates.map(date => (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() => handleDateSelect(date)}
+                          className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                            selectedDate === date
+                              ? 'bg-gray-900 text-white border-gray-900'
+                              : 'border-gray-200 text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          {formatDateChip(date)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <BookingCalendarView windows={windows} selectedDate={selectedDate} onSelectDate={handleDateSelect} />
+                  )}
                 </div>
 
                 {/* Step 2 — time */}
@@ -248,8 +291,13 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
                       <TimePicker label="Start time" value={startTime} onChange={setStartTime} />
                       <TimePicker label="End time" value={endTime} onChange={setEndTime} />
                     </div>
-                    {!timesValid && startTime && endTime && (
+                    {startTime && endTime && !endAfterStart && (
                       <p className="text-xs text-red-500 mt-1">End time must be after start time.</p>
+                    )}
+                    {startTime && endTime && endAfterStart && !withinTutorWindow && (
+                      <p className="text-xs text-red-500 mt-1">
+                        That time is outside {tutorName}&rsquo;s available hours that day — pick a time within the range shown above.
+                      </p>
                     )}
                   </div>
                 )}
@@ -297,6 +345,9 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
                       placeholder={`Hi ${tutorName}, I'd love to schedule a lesson…`}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                     />
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Not sure this exact time will work? Mention a couple of backup times in your message — {tutorName} can suggest a different time when they respond.
+                    </p>
                   </div>
                 )}
 

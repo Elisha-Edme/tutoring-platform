@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",
+    "@vercel/blob": "^2.8.0",
     "googleapis": "^173.0.0",
     "jose": "^6.2.3",
     "next": "16.2.9",

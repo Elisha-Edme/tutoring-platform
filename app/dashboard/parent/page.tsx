@@ -4,6 +4,9 @@ import Navbar from '@/components/Navbar'
 import { getSession } from '@/lib/auth'
 import ManageChildren from './ManageChildren'
 import LessonRequestsList from './LessonRequestsList'
+import PastLessonsList from './PastLessonsList'
+import DashboardPanels from './DashboardPanels'
+import ReviewPromptPanel from './ReviewPromptPanel'
 
 export default async function ParentDashboard() {
   const session = await getSession()
@@ -22,6 +25,8 @@ export default async function ParentDashboard() {
             page render (see TutorGrid for the same reason). */}
         <ManageChildren />
 
+        <DashboardPanels />
+
         <section className="mb-10">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
             Lesson requests
@@ -29,6 +34,15 @@ export default async function ParentDashboard() {
           {/* Fetches /api/parent/requests client-side — keeps googleapis out of render. */}
           <LessonRequestsList />
         </section>
+
+        <section className="mb-10">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
+            Past Lessons
+          </h2>
+          <PastLessonsList />
+        </section>
+
+        <ReviewPromptPanel />
 
         <section className="mb-10">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">

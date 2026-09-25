@@ -2,165 +2,159 @@
 
 import { useState } from 'react'
 
-const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const DURATIONS = [30, 45, 60, 90, 120]
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export interface WeeklyWindowFormData {
-  repeatType: 'weekly'
-  repeatInterval: 1
+function dayAbbrevFromDate(dateStr: string): string {
+  return DAY_NAMES[new Date(`${dateStr}T00:00:00`).getDay()]
+}
+
+export interface RecurringLessonFormData {
+  repeatType: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  repeatInterval: number
   repeatDays: string[]
-  startTime: string
-  endTime: string
-  lessonDurationMinutes: number
-  endsType: 'never'
-  endsDate: ''
-  endsAfterCount: 0
+  endsType: 'never' | 'on' | 'after'
+  endsDate: string
+  endsAfterCount: number
 }
 
 interface Props {
-  onSave: (data: WeeklyWindowFormData) => Promise<void>
+  onSave: (data: RecurringLessonFormData) => void
   onClose: () => void
+  // Seeds the weekly day-of-week default to match the lesson's own date —
+  // still editable, just a sensible starting point.
+  anchorDate?: string
+  // Pre-fills the picker with an existing rule — used when editing (always
+  // overriding) an already-live recurring booking's schedule, as opposed to
+  // setting one up fresh.
+  initial?: RecurringLessonFormData
 }
 
-function pad2(n: number) { return String(n).padStart(2, '0') }
+const UNIT_LABELS: Record<RecurringLessonFormData['repeatType'], string> = {
+  daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year',
+}
 
-function TimePicker({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
-  const [hStr, mStr] = value.split(':')
-  const h = parseInt(hStr, 10)
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  const h12 = h % 12 || 12
-  const hours12 = Array.from({ length: 12 }, (_, i) => i + 1)
-  const minutes = ['00', '15', '30', '45']
-  const inputCls = 'border border-gray-300 rounded px-2 py-1.5 text-sm bg-white'
-
-  const emit = (newH12: number, newM: string, newAmpm: string) => {
-    let h24 = newH12 % 12
-    if (newAmpm === 'PM') h24 += 12
-    onChange(`${pad2(h24)}:${newM}`)
-  }
-
-  return (
-    <div>
-      {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
-      <div className="flex items-center gap-1">
-        <select value={h12} onChange={e => emit(parseInt(e.target.value, 10), mStr, ampm)} className={inputCls}>
-          {hours12.map(h => <option key={h} value={h}>{h}</option>)}
-        </select>
-        <span className="text-gray-400 text-sm">:</span>
-        <select value={mStr} onChange={e => emit(h12, e.target.value, ampm)} className={inputCls}>
-          {minutes.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select value={ampm} onChange={e => emit(h12, mStr, e.target.value)} className={inputCls}>
-          <option>AM</option><option>PM</option>
-        </select>
-      </div>
-    </div>
+export default function RecurrenceModal({ onSave, onClose, anchorDate, initial }: Props) {
+  const [repeatType, setRepeatType] = useState<RecurringLessonFormData['repeatType']>(initial?.repeatType ?? 'weekly')
+  const [repeatInterval, setRepeatInterval] = useState(initial?.repeatInterval ?? 1)
+  const [repeatDays, setRepeatDays] = useState<string[]>(
+    initial?.repeatDays ?? (anchorDate ? [dayAbbrevFromDate(anchorDate)] : []),
   )
-}
-
-export default function RecurrenceModal({ onSave, onClose }: Props) {
-  const [days, setDays] = useState<string[]>(['Mon'])
-  const [startTime, setStartTime] = useState('16:00')
-  const [endTime, setEndTime] = useState('18:00')
-  const [duration, setDuration] = useState(60)
-  const [saving, setSaving] = useState(false)
+  const [endsType, setEndsType] = useState<'never' | 'on' | 'after'>(initial?.endsType ?? 'never')
+  const [endsDate, setEndsDate] = useState(initial?.endsDate ?? '')
+  const [endsAfterCount, setEndsAfterCount] = useState(initial?.endsAfterCount ?? 10)
   const [error, setError] = useState('')
 
-  const toggleDay = (day: string) =>
-    setDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
+  const toggleDay = (day: string) => {
+    setRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
+  }
 
-  const handleSave = async () => {
-    if (days.length === 0) { setError('Select at least one day.'); return }
-    if (!startTime || !endTime) { setError('Set start and end times.'); return }
-    if (startTime >= endTime) { setError('End time must be after start time.'); return }
-    setSaving(true)
+  const handleSave = () => {
+    if (repeatType === 'weekly' && repeatDays.length === 0) { setError('Pick at least one day.'); return }
+    if (endsType === 'on' && !endsDate) { setError('Pick an end date.'); return }
+    if (endsType === 'after' && endsAfterCount < 1) { setError('Enter at least 1 lesson.'); return }
     setError('')
-    try {
-      await onSave({
-        repeatType: 'weekly',
-        repeatInterval: 1,
-        repeatDays: days,
-        startTime,
-        endTime,
-        lessonDurationMinutes: duration,
-        endsType: 'never',
-        endsDate: '',
-        endsAfterCount: 0,
-      })
-    } catch {
-      setError('Failed to save. Please try again.')
-      setSaving(false)
-    }
+    onSave({
+      repeatType,
+      repeatInterval,
+      repeatDays: repeatType === 'weekly' ? repeatDays : [],
+      endsType,
+      endsDate: endsType === 'on' ? endsDate : '',
+      endsAfterCount: endsType === 'after' ? endsAfterCount : 0,
+    })
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-5">Add availability window</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">Repeat this lesson</h2>
 
-        {/* Days */}
         <div className="mb-5">
-          <p className="text-sm font-medium text-gray-700 mb-2">Which days?</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {DAYS_SHORT.map(day => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => toggleDay(day)}
-                className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                  days.includes(day)
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'border-gray-300 text-gray-600 hover:border-gray-500'
-                }`}
-              >
-                {day}
-              </button>
-            ))}
+          <label className="block text-sm font-medium text-gray-700 mb-2">Repeat every</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={repeatInterval}
+              onChange={e => setRepeatInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="w-16 border border-gray-300 rounded-md px-2 py-1.5 text-sm text-center"
+            />
+            <select
+              value={repeatType}
+              onChange={e => setRepeatType(e.target.value as RecurringLessonFormData['repeatType'])}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+            >
+              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(t => (
+                <option key={t} value={t}>{UNIT_LABELS[t]}{repeatInterval > 1 ? 's' : ''}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Times */}
-        <div className="mb-5">
-          <p className="text-sm font-medium text-gray-700 mb-3">What hours?</p>
-          <div className="flex items-end gap-4 flex-wrap">
-            <TimePicker value={startTime} onChange={setStartTime} label="From" />
-            <TimePicker value={endTime} onChange={setEndTime} label="To" />
+        {repeatType === 'weekly' && (
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Repeat on</label>
+            <div className="flex gap-1.5">
+              {DAY_NAMES.map(day => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`w-9 h-9 rounded-full text-xs font-medium border transition ${
+                    repeatDays.includes(day) ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600 hover:border-gray-500'
+                  }`}
+                >
+                  {day[0]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Duration */}
         <div className="mb-5">
-          <p className="text-sm font-medium text-gray-700 mb-2">Lesson length</p>
-          <div className="flex gap-2 flex-wrap">
-            {DURATIONS.map(d => (
+          <label className="block text-sm font-medium text-gray-700 mb-2">Ends</label>
+          <div className="flex gap-2 flex-wrap mb-3">
+            {(['never', 'on', 'after'] as const).map(t => (
               <button
-                key={d}
+                key={t}
                 type="button"
-                onClick={() => setDuration(d)}
+                onClick={() => setEndsType(t)}
                 className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                  duration === d
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'border-gray-300 text-gray-600 hover:border-gray-500'
+                  endsType === t ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600 hover:border-gray-500'
                 }`}
               >
-                {d < 60 ? `${d} min` : `${d / 60} hr`}
+                {t === 'never' ? 'Never' : t === 'on' ? 'On date' : 'After N lessons'}
               </button>
             ))}
           </div>
+          {endsType === 'on' && (
+            <input
+              type="date"
+              value={endsDate}
+              onChange={e => setEndsDate(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm w-full"
+            />
+          )}
+          {endsType === 'after' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={endsAfterCount}
+                onChange={e => setEndsAfterCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="w-16 border border-gray-300 rounded-md px-2 py-1.5 text-sm text-center"
+              />
+              <span className="text-sm text-gray-600">lessons</span>
+            </div>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} disabled={saving} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2">
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-gray-900 text-white text-sm px-5 py-2 rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save'}
+          <button onClick={onClose} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2">Cancel</button>
+          <button onClick={handleSave} className="bg-gray-900 text-white text-sm px-5 py-2 rounded-md hover:bg-gray-700 transition">
+            Save
           </button>
         </div>
       </div>

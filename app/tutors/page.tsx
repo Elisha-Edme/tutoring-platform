@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 export default async function TutorsPage() {
   const session = await getSession()
   const isParent = session?.role === 'parent'
+  const isSignedIn = !!session
 
   return (
     <main className="min-h-screen bg-white">
@@ -17,7 +18,7 @@ export default async function TutorsPage() {
         {/* TutorGrid fetches /api/tutors on the client — keeps googleapis out of
             the page render, which crashes Next.js 16 with "ArrayBuffer is not
             detachable". Route handlers read Sheets fine. */}
-        <TutorGrid isParent={isParent} />
+        <TutorGrid isParent={isParent} isSignedIn={isSignedIn} />
       </div>
     </main>
   )

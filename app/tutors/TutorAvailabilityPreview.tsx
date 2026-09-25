@@ -32,7 +32,12 @@ export default function TutorAvailabilityPreview({ tutorUserId }: { tutorUserId:
     const toDate = new Date(today.getTime() + 28 * 24 * 60 * 60 * 1000)
     const to = toDate.toISOString().slice(0, 10)
 
-    fetch(`/api/tutors/${tutorUserId}/windows?from=${from}&to=${to}`)
+    // excludeBooked=false: this collapses several weeks onto one 7-day grid by
+    // day-of-week, so excluding booked time would blank out every occurrence
+    // of that weekday, not just the one actually booked. It's a general
+    // weekly-shape preview, not a literal calendar — BookingModal's own
+    // per-date picker is what actually needs booked time excluded.
+    fetch(`/api/tutors/${tutorUserId}/windows?from=${from}&to=${to}&excludeBooked=false`)
       .then(r => r.ok ? r.json() : { windows: {} })
       .then(data => {
         const windows: Record<string, { startTime: string; endTime: string }[]> = data.windows ?? {}
