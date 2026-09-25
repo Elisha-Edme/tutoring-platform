@@ -2,13 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import type { TutorAvailabilityRule, AvailabilityException } from '@/lib/types'
-import { formatTime } from '@/lib/schedule'
+import { formatTime, describeLessonRecurrence } from '@/lib/schedule'
+import type { LessonRequest } from '@/lib/types'
 import WeeklyAvailabilityGrid, { type ScheduleBlock } from './WeeklyAvailabilityGrid'
 import ExceptionModal from './ExceptionModal'
 
+// 'booked' rows come back from GET /api/tutor/availability with a childName
+// the sheet row itself doesn't store (looked up server-side) — see that
+// route for why.
+type EnrichedException = AvailabilityException & { childName?: string }
+
 export default function AvailabilityEditor() {
   const [rules, setRules] = useState<TutorAvailabilityRule[]>([])
-  const [exceptions, setExceptions] = useState<AvailabilityException[]>([])
+  const [exceptions, setExceptions] = useState<EnrichedException[]>([])
   const [loading, setLoading] = useState(true)
   const [showException, setShowException] = useState(false)
   const [error, setError] = useState('')
@@ -76,10 +82,11 @@ export default function AvailabilityEditor() {
       <div>
         <h3 className="text-sm font-semibold text-gray-800 mb-1">Your weekly schedule</h3>
         <p className="text-xs text-gray-400 mb-4">
-          Click or drag to mark the hours you're available each week.
+          Click or drag to mark the hours you&rsquo;re available each week.
         </p>
         <WeeklyAvailabilityGrid
           initialRules={rules}
+          bookedExceptions={exceptions.filter(e => e.type === 'booked')}
           onSave={handleSaveSchedule}
         />
       </div>
@@ -98,23 +105,44 @@ export default function AvailabilityEditor() {
                 key={exc.id}
                 className="flex items-center justify-between gap-3 text-sm text-gray-600"
               >
-                <span>
-                  {exc.startDate === exc.endDate
-                    ? exc.startDate
-                    : `${exc.startDate} → ${exc.endDate}`}
-                  {' — '}
-                  {exc.type === 'blocked'
-                    ? 'Off'
-                    : `${formatTime(exc.startTime)}–${formatTime(exc.endTime)}`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteException(exc.id)}
-                  aria-label="Delete exception"
-                  className="text-gray-400 hover:text-red-500 transition"
-                >
-                  ×
-                </button>
+                {exc.type === 'booked' ? (
+                  <span>
+                    Booked: {exc.childName || 'a student'} — {describeLessonRecurrence({
+                      repeatType: exc.repeatType as LessonRequest['repeatType'],
+                      repeatInterval: exc.repeatInterval,
+                      repeatDays: exc.repeatDays,
+                      requestedStartTime: exc.startTime,
+                      requestedEndTime: exc.endTime,
+                      endsType: exc.endsType as LessonRequest['endsType'],
+                      endsDate: exc.endsDate,
+                      endsAfterCount: exc.endsAfterCount,
+                    })}
+                  </span>
+                ) : (
+                  <span>
+                    {exc.startDate === exc.endDate
+                      ? exc.startDate
+                      : `${exc.startDate} → ${exc.endDate}`}
+                    {' — '}
+                    {exc.type === 'blocked'
+                      ? 'Off'
+                      : `${formatTime(exc.startTime)}–${formatTime(exc.endTime)}`}
+                  </span>
+                )}
+                {exc.type === 'booked' ? (
+                  // Not deletable from here — only by cancelling the actual
+                  // lesson series (My Students -> Cancel series).
+                  <span className="text-xs text-gray-400 shrink-0">via lesson</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteException(exc.id)}
+                    aria-label="Delete exception"
+                    className="text-gray-400 hover:text-red-500 transition"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             ))}
           </div>

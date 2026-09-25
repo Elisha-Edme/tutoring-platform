@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { getLessonRequestById, getParentProfile, getTutorByUserId, updateLessonRequest } from '@/lib/sheets'
 import { canTransitionLessonStatus, isAwaitingParentApproval } from '@/lib/lessons'
-import { materializeFirstOccurrence } from '@/lib/booking-completion'
+import { materializeFirstOccurrence, deleteBookingException } from '@/lib/booking-completion'
+import { findSchedulingConflict } from '@/lib/availability'
+import { formatTime } from '@/lib/schedule'
 import {
   sendEmail, lessonAcceptedEmailHtml, lessonCancelledEmailHtml, lessonProposalDecisionEmailHtml,
 } from '@/lib/email'
@@ -135,6 +137,19 @@ export async function PUT(
     )
   }
 
+  // The tutor already committed to this time when they proposed it, but
+  // another booking may have taken the slot in the meantime — re-check
+  // before graduating it into a live lesson.
+  if (parentApprovingTutorProposal) {
+    const conflict = await findSchedulingConflict(existing.tutorUserId, existing)
+    if (conflict) {
+      return NextResponse.json(
+        { error: `That time is no longer free — conflicts with the tutor's schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+        { status: 409 },
+      )
+    }
+  }
+
   const updated = await updateLessonRequest(id, {
     status: status as UpdateableStatus,
     ...(decliningParentRequest ? { declineReason: reason!.trim() } : {}),
@@ -144,6 +159,9 @@ export async function PUT(
 
   if (parentApprovingTutorProposal) {
     await materializeFirstOccurrence(updated)
+  }
+  if (status === 'cancelled') {
+    await deleteBookingException(id)
   }
 
   try {

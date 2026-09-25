@@ -101,22 +101,37 @@ export default function UpcomingLessonsCalendar({ lessons, onPropose, onRespond,
 
       {detail && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDetail(null)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-sm font-semibold text-gray-900">{detail.childName} with {detail.parentName}</p>
-              <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                  <div>
+                    <p className="text-base font-semibold text-gray-900 leading-snug">{detail.childName} with {detail.parentName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatLessonDate(detail.date)}</p>
+                  </div>
+                </div>
+                <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none shrink-0">×</button>
+              </div>
+              <div className="flex items-center gap-1.5 mt-3 text-sm text-gray-600 pl-[19px]">
+                <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 text-gray-400 shrink-0">
+                  <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10 6v4l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {formatTime(detail.startTime)}–{formatTime(detail.endTime)} EST
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mb-2">
-              {formatLessonDate(detail.date)} · {formatTime(detail.startTime)}–{formatTime(detail.endTime)} EST
-            </p>
-            <TutorLessonActions
-              lesson={detail}
-              onPropose={onPropose}
-              onRespond={onRespond}
-              onComplete={onComplete}
-              onOccurrenceStatus={onOccurrenceStatus}
-              submitting={submitting}
-            />
+            <div className="px-5 py-4">
+              <TutorLessonActions
+                lesson={detail}
+                onPropose={onPropose}
+                onRespond={onRespond}
+                onComplete={onComplete}
+                onOccurrenceStatus={onOccurrenceStatus}
+                submitting={submitting}
+                variant="popup"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -2,7 +2,10 @@
 // writes and email sends — the same carve-out lib/email.ts gets for touching
 // nodemailer. It exists to de-duplicate the one side effect shared by the
 // manual "write a summary early" path and the cron auto-completer.
-import { getParentProfile, getTutorByUserId, updateLessonRequest, updateTutorProfile, createLessonOccurrence } from './sheets'
+import {
+  getParentProfile, getTutorByUserId, updateLessonRequest, updateTutorProfile, createLessonOccurrence,
+  createAvailabilityException, getExceptionBySourceLessonRequestId, deleteAvailabilityException,
+} from './sheets'
 import { sendEmail, lessonCompletedEmailHtml, lessonCancelledEmailHtml, lessonCancelledByParentEmailHtml } from './email'
 import type { LessonRequest, LessonOccurrence } from './types'
 import { randomUUID } from 'crypto'
@@ -37,6 +40,44 @@ export async function materializeFirstOccurrence(booking: LessonRequest): Promis
     rescheduledDate: '',
   }
   await createLessonOccurrence(occurrence)
+  await createBookingException(booking)
+}
+
+// Mirrors a *recurring* booking's schedule into a system-owned
+// AvailabilityException row (type='booked') so the tutor's own weekly
+// schedule view can show it — see that type's doc comment in lib/types.ts
+// for why one-time bookings don't get one, and why this is never read by
+// getAvailableWindows/getBookedIntervals (display-only, not load-bearing for
+// double-booking prevention). Called once, at the single choke point every
+// "this booking is now live" path already funnels through.
+async function createBookingException(booking: LessonRequest): Promise<void> {
+  if (booking.repeatType === 'once') return
+  await createAvailabilityException({
+    id: `exc_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+    tutorUserId: booking.tutorUserId,
+    startDate: booking.requestedDate,
+    endDate: booking.requestedDate,
+    type: 'booked',
+    startTime: booking.requestedStartTime,
+    endTime: booking.requestedEndTime,
+    createdAt: new Date().toISOString(),
+    repeatType: booking.repeatType,
+    repeatInterval: booking.repeatInterval,
+    repeatDays: booking.repeatDays,
+    endsType: booking.endsType,
+    endsDate: booking.endsDate,
+    endsAfterCount: booking.endsAfterCount,
+    sourceLessonRequestId: booking.id,
+  })
+}
+
+// Removes the 'booked' AvailabilityException row mirroring `lessonRequestId`,
+// if one exists (only recurring bookings ever get one). Called when a
+// recurring series is cancelled (PUT /api/lessons/[id]/status). A no-op for
+// one-time bookings, which never had a row to begin with.
+export async function deleteBookingException(lessonRequestId: string): Promise<void> {
+  const exc = await getExceptionBySourceLessonRequestId(lessonRequestId)
+  if (exc) await deleteAvailabilityException(exc.id)
 }
 
 // If `booking` is a one-time (non-recurring) booking, flip it to 'complete'

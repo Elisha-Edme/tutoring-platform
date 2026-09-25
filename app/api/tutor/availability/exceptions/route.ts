@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
   if (startDate > endDate) {
     return NextResponse.json({ error: 'endDate must be on or after startDate.' }, { status: 400 })
   }
+  // 'booked' rows are system-written only — see materializeFirstOccurrence
+  // in lib/booking-completion.ts — never created through this manual form.
+  if (type !== 'blocked' && type !== 'modified') {
+    return NextResponse.json({ error: 'type must be "blocked" or "modified".' }, { status: 400 })
+  }
   if (type === 'modified' && (!startTime || !endTime)) {
     return NextResponse.json({ error: 'Modified exceptions require startTime and endTime.' }, { status: 400 })
   }
@@ -31,6 +36,8 @@ export async function POST(request: NextRequest) {
     tutorUserId: session.userId,
     startDate, endDate, type, startTime, endTime,
     createdAt: new Date().toISOString(),
+    repeatType: '', repeatInterval: 0, repeatDays: [], endsType: '', endsDate: '', endsAfterCount: 0,
+    sourceLessonRequestId: '',
   }
 
   await createAvailabilityException(exc)

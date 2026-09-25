@@ -230,6 +230,13 @@ export async function getParentProfile(userId: string): Promise<ParentProfile | 
   return { userId: row[0], email: row[1], name: row[2], children }
 }
 
+// Bulk read, without children — pair with getAllChildren() and group by
+// parentUserId, same as getParentProfile() does per-id.
+export async function getAllParentProfiles(): Promise<Omit<ParentProfile, 'children'>[]> {
+  const rows = await getDataRows('ParentProfiles')
+  return rows.filter(r => r.length > 0 && r[0]).map(r => ({ userId: r[0], email: r[1], name: r[2] }))
+}
+
 // ── Children ─────────────────────────────────────────────────────────────────
 // Columns: parentUserId, name, grade, instrument
 
@@ -242,6 +249,16 @@ export async function getChildrenByParent(parentUserId: string): Promise<Child[]
       grade: r[2] ?? '',
       instruments: r[3] ? r[3].split(',').map(s => s.trim()) : [],
     }))
+}
+
+export async function getAllChildren(): Promise<(Child & { parentUserId: string })[]> {
+  const rows = await getDataRows('Children')
+  return rows.filter(r => r.length > 0 && r[0]).map(r => ({
+    parentUserId: r[0],
+    name: r[1] ?? '',
+    grade: r[2] ?? '',
+    instruments: r[3] ? r[3].split(',').map(s => s.trim()) : [],
+  }))
 }
 
 // ── Deletion ─────────────────────────────────────────────────────────────────
@@ -282,6 +299,11 @@ export async function deleteTutorByEmail(email: string): Promise<{ users: number
   const users = await deleteRowsWhere('Users', 1, email)
   const tutors = await deleteRowsWhere('TutorProfiles', 1, email)
   return { users, tutors }
+}
+
+// For non-tutor accounts (e.g. admin) that have no TutorProfiles row to clean up.
+export async function deleteUserByEmail(email: string): Promise<number> {
+  return deleteRowsWhere('Users', 1, email)
 }
 
 // ── TutorAvailability ─────────────────────────────────────────────────────────
@@ -326,7 +348,11 @@ export async function deleteAvailabilityRule(id: string): Promise<void> {
 }
 
 // ── AvailabilityExceptions ─────────────────────────────────────────────────────
-// Columns: id, tutorUserId, startDate, endDate, type, startTime, endTime, createdAt
+// Columns: id, tutorUserId, startDate, endDate, type, startTime, endTime, createdAt,
+//          repeatType, repeatInterval, repeatDays, endsType, endsDate, endsAfterCount, sourceLessonRequestId
+// The last 7 columns are only ever populated for type='booked' rows (see
+// AvailabilityException in lib/types.ts) — blank/0 for manual 'blocked'|'modified'
+// rows, decoded with the same defaults used elsewhere in this file.
 
 function rowToException(row: string[]): AvailabilityException {
   return {
@@ -338,11 +364,22 @@ function rowToException(row: string[]): AvailabilityException {
     startTime: row[5] ?? '',
     endTime: row[6] ?? '',
     createdAt: row[7] ?? '',
+    repeatType: (row[8] ?? '') as AvailabilityException['repeatType'],
+    repeatInterval: parseInt(row[9] || '1', 10),
+    repeatDays: row[10] ? row[10].split(',').map(s => s.trim()) : [],
+    endsType: (row[11] ?? '') as AvailabilityException['endsType'],
+    endsDate: row[12] ?? '',
+    endsAfterCount: parseInt(row[13] || '0', 10),
+    sourceLessonRequestId: row[14] ?? '',
   }
 }
 
 function exceptionToRow(e: AvailabilityException): string[] {
-  return [e.id, e.tutorUserId, e.startDate, e.endDate, e.type, e.startTime, e.endTime, e.createdAt]
+  return [
+    e.id, e.tutorUserId, e.startDate, e.endDate, e.type, e.startTime, e.endTime, e.createdAt,
+    e.repeatType, String(e.repeatInterval), e.repeatDays.join(','),
+    e.endsType, e.endsDate ?? '', String(e.endsAfterCount ?? 0), e.sourceLessonRequestId,
+  ]
 }
 
 export async function createAvailabilityException(exc: AvailabilityException): Promise<void> {
@@ -352,6 +389,31 @@ export async function createAvailabilityException(exc: AvailabilityException): P
 export async function getExceptionsByTutor(tutorUserId: string): Promise<AvailabilityException[]> {
   const rows = await getDataRows('AvailabilityExceptions')
   return rows.filter(r => r[1] === tutorUserId).map(rowToException)
+}
+
+export async function getExceptionBySourceLessonRequestId(lessonRequestId: string): Promise<AvailabilityException | null> {
+  const rows = await getDataRows('AvailabilityExceptions')
+  const row = rows.find(r => r[14] === lessonRequestId)
+  return row ? rowToException(row) : null
+}
+
+export async function updateAvailabilityException(
+  id: string,
+  patch: Partial<AvailabilityException>,
+): Promise<AvailabilityException | null> {
+  const rows = await getDataRows('AvailabilityExceptions')
+  const i = rows.findIndex(r => r[0] === id)
+  if (i === -1) return null
+  const updated = { ...rowToException(rows[i]), ...patch }
+  const sheets = await getSheets()
+  const r = i + 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID(),
+    range: `AvailabilityExceptions!A${r}:O${r}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [exceptionToRow(updated)] },
+  })
+  return updated
 }
 
 export async function deleteAvailabilityException(id: string): Promise<void> {

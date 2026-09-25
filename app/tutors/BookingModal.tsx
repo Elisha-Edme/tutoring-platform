@@ -28,7 +28,16 @@ function TimePicker({ label, value, onChange }: {
   const lastCommittedRef = useRef(mStr)
 
   useEffect(() => {
-    if (mStr !== lastCommittedRef.current) setMDisplay(mStr)
+    // Update the ref here too, not just in commit() — otherwise it stays
+    // frozen at whatever minute was on screen at mount, so a LATER external
+    // change (e.g. picking a different date) whose minute happens to match
+    // that stale, frozen value gets silently skipped, leaving the display
+    // stuck on an earlier date's minute even though the hour (read fresh
+    // from `value` every render) updates correctly.
+    if (mStr !== lastCommittedRef.current) {
+      setMDisplay(mStr)
+      lastCommittedRef.current = mStr
+    }
   }, [mStr])
 
   const commit = (nh12: number, nm: string, nAmpm: string) => {
@@ -113,7 +122,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
   const [endTime, setEndTime] = useState('10:00')
   const [selectedChild, setSelectedChild] = useState('')
   const [message, setMessage] = useState('')
-  const [dateView, setDateView] = useState<'list' | 'calendar'>('list')
+  const [dateView, setDateView] = useState<'list' | 'calendar'>('calendar')
 
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -198,7 +207,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
             <div className="text-3xl mb-4">✓</div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Request sent!</h2>
             <p className="text-sm text-gray-500 mb-6">
-              We've sent your request to {tutorName}. They'll be in touch soon.
+              We&rsquo;ve sent your request to {tutorName}. They&rsquo;ll be in touch soon.
             </p>
             <button
               onClick={onClose}
@@ -222,7 +231,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
               <p className="text-sm text-gray-400 py-4">Loading availability…</p>
             ) : availableDates.length === 0 ? (
               <p className="text-sm text-gray-500 py-4">
-                {tutorName} hasn't set their availability yet. Check back later.
+                {tutorName} hasn&rsquo;t set their availability yet. Check back later.
               </p>
             ) : (
               <>
@@ -233,17 +242,17 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
                     <div className="flex gap-1">
                       <button
                         type="button"
-                        onClick={() => setDateView('list')}
-                        className={`text-xs px-2 py-1 rounded-full transition ${dateView === 'list' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'}`}
-                      >
-                        List
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setDateView('calendar')}
                         className={`text-xs px-2 py-1 rounded-full transition ${dateView === 'calendar' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'}`}
                       >
                         Calendar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDateView('list')}
+                        className={`text-xs px-2 py-1 rounded-full transition ${dateView === 'list' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'}`}
+                      >
+                        List
                       </button>
                     </div>
                   </div>

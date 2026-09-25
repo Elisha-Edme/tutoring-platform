@@ -108,6 +108,10 @@ interface Props {
   onComplete: (lessonRequestId: string, occurrenceDate: string, summary: string) => Promise<void>
   onOccurrenceStatus: (lessonRequestId: string, occurrenceDate: string, status: 'no_show' | 'cancelled', note: string) => Promise<void>
   submitting: boolean
+  // 'popup' (the Calendar view's detail popup) gets larger, pill-shaped
+  // buttons — a bigger surface than the Box view's inline row, so the
+  // default compact text-xs buttons look undersized there.
+  variant?: 'compact' | 'popup'
 }
 
 // The interactive part of a single upcoming-lesson card — proposed-time
@@ -115,8 +119,18 @@ interface Props {
 // the Box view (rendered inline per row) and the Calendar view (rendered
 // inside a detail popup), so both surfaces offer the same actions instead of
 // the calendar being read-only.
-export default function TutorLessonActions({ lesson: l, onPropose, onRespond, onComplete, onOccurrenceStatus, submitting }: Props) {
+export default function TutorLessonActions({ lesson: l, onPropose, onRespond, onComplete, onOccurrenceStatus, submitting, variant = 'compact' }: Props) {
   const [mode, setMode] = useState<FormMode>(null)
+  const isPopup = variant === 'popup'
+  const primaryBtn = isPopup
+    ? 'text-sm bg-gray-900 text-white px-4 py-2 rounded-full hover:bg-gray-700 transition disabled:opacity-50'
+    : 'text-xs bg-gray-900 text-white px-2.5 py-1 rounded-md hover:bg-gray-700 transition disabled:opacity-50'
+  const secondaryBtn = isPopup
+    ? 'text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:border-gray-500 transition disabled:opacity-50'
+    : 'text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition disabled:opacity-50'
+  const linkBtn = isPopup
+    ? 'text-sm text-gray-600 underline hover:text-gray-900'
+    : 'text-xs text-gray-500 underline hover:text-gray-800'
 
   return (
     <>
@@ -130,18 +144,10 @@ export default function TutorLessonActions({ lesson: l, onPropose, onRespond, on
             Parent suggested {formatLessonDate(l.proposedDate)}, {formatTime(l.proposedStartTime!)}–{formatTime(l.proposedEndTime!)} EST
           </p>
           <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'approve')}
-              disabled={submitting}
-              className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-            >
+            <button onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'approve')} disabled={submitting} className={primaryBtn}>
               Approve
             </button>
-            <button
-              onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'decline')}
-              disabled={submitting}
-              className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition disabled:opacity-50"
-            >
+            <button onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'decline')} disabled={submitting} className={secondaryBtn}>
               Decline
             </button>
           </div>
@@ -189,35 +195,26 @@ export default function TutorLessonActions({ lesson: l, onPropose, onRespond, on
       )}
 
       {!mode && !l.proposedBy && (
-        <div className="flex gap-3 mt-2 flex-wrap">
-          <button
-            onClick={() => setMode('summary')}
-            className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded-md hover:bg-gray-700 transition"
-          >
+        <div className={`flex gap-3 flex-wrap ${isPopup ? 'mt-3' : 'mt-2'}`}>
+          <button onClick={() => setMode('summary')} className={primaryBtn}>
             Complete &amp; write summary
           </button>
           {l.hasPassed ? (
-            <button
-              onClick={() => setMode('no_show')}
-              className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition"
-            >
+            <button onClick={() => setMode('no_show')} className={secondaryBtn}>
               Mark no-show
             </button>
           ) : (
-            <button
-              onClick={() => setMode('cancelled')}
-              className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition"
-            >
+            <button onClick={() => setMode('cancelled')} className={secondaryBtn}>
               Cancel this lesson
             </button>
           )}
           {l.canPropose && (
-            <button onClick={() => setMode('propose')} className="text-xs text-gray-500 underline hover:text-gray-800">
+            <button onClick={() => setMode('propose')} className={linkBtn}>
               Suggest new time
             </button>
           )}
           {l.canOverride && (
-            <button onClick={() => setMode('override')} className="text-xs text-gray-500 underline hover:text-gray-800">
+            <button onClick={() => setMode('override')} className={linkBtn}>
               Override time
             </button>
           )}

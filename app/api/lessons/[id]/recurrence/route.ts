@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
-import { getLessonRequestById, updateLessonRequest } from '@/lib/sheets'
+import { getLessonRequestById, updateLessonRequest, getExceptionBySourceLessonRequestId, updateAvailabilityException } from '@/lib/sheets'
+import { findSchedulingConflict } from '@/lib/availability'
+import { formatTime } from '@/lib/schedule'
 
 // Tutor-only override of an existing recurring booking's schedule — "always
 // an override," per the product decision that a tutor modifying a student's
@@ -54,15 +56,55 @@ export async function PATCH(
     return NextResponse.json({ error: 'Enter at least 1 lesson.' }, { status: 400 })
   }
 
+  const newRepeatInterval = repeatInterval ?? 1
+  const newRepeatDays = repeatType === 'weekly' ? (repeatDays ?? []) : []
+  const newEndsType = (endsType as 'never' | 'on' | 'after') ?? 'never'
+  const newEndsDate = endsType === 'on' ? (endsDate ?? '') : ''
+  const newEndsAfterCount = endsType === 'after' ? (endsAfterCount ?? 0) : 0
+
+  // Re-check the *new* schedule against the tutor's other bookings, excluding
+  // this booking's own current occurrences (we're moving them, not adding a
+  // second commitment on top of them).
+  const conflict = await findSchedulingConflict(session.userId, {
+    ...existing,
+    repeatType: repeatType as 'daily' | 'weekly' | 'monthly' | 'yearly',
+    repeatInterval: newRepeatInterval,
+    repeatDays: newRepeatDays,
+    endsType: newEndsType,
+    endsDate: newEndsDate,
+    endsAfterCount: newEndsAfterCount,
+  }, id)
+  if (conflict) {
+    return NextResponse.json(
+      { error: `That conflicts with your own schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+      { status: 409 },
+    )
+  }
+
   const updated = await updateLessonRequest(id, {
     repeatType: repeatType as 'daily' | 'weekly' | 'monthly' | 'yearly',
-    repeatInterval: repeatInterval ?? 1,
-    repeatDays: repeatType === 'weekly' ? (repeatDays ?? []) : [],
-    endsType: (endsType as 'never' | 'on' | 'after') ?? 'never',
-    endsDate: endsType === 'on' ? (endsDate ?? '') : '',
-    endsAfterCount: endsType === 'after' ? (endsAfterCount ?? 0) : 0,
+    repeatInterval: newRepeatInterval,
+    repeatDays: newRepeatDays,
+    endsType: newEndsType,
+    endsDate: newEndsDate,
+    endsAfterCount: newEndsAfterCount,
   })
   if (!updated) return NextResponse.json({ error: 'Update failed.' }, { status: 500 })
+
+  // Keep the mirrored 'booked' exception row (see lib/booking-completion.ts)
+  // in sync — it's display-only, but a stale row would show the wrong days/
+  // hours on the tutor's own weekly schedule.
+  const exc = await getExceptionBySourceLessonRequestId(id)
+  if (exc) {
+    await updateAvailabilityException(exc.id, {
+      repeatType: updated.repeatType,
+      repeatInterval: updated.repeatInterval,
+      repeatDays: updated.repeatDays,
+      endsType: updated.endsType,
+      endsDate: updated.endsDate,
+      endsAfterCount: updated.endsAfterCount,
+    })
+  }
 
   return NextResponse.json({ ok: true, request: updated })
 }

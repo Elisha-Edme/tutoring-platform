@@ -5,6 +5,7 @@ import {
   getExceptionsByTutor,
   createAvailabilityRule,
   deleteAvailabilityRule,
+  getLessonRequestsByTutor,
 } from '@/lib/sheets'
 import type { TutorAvailabilityRule } from '@/lib/types'
 import { randomUUID } from 'crypto'
@@ -14,11 +15,19 @@ export async function GET() {
   if (!session || session.role !== 'tutor') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const [rules, exceptions] = await Promise.all([
+  const [rules, exceptions, requests] = await Promise.all([
     getAvailabilityRulesByTutor(session.userId),
     getExceptionsByTutor(session.userId),
+    getLessonRequestsByTutor(session.userId),
   ])
-  return NextResponse.json({ rules, exceptions })
+  // 'booked' rows mirror a LessonRequest but don't carry its childName —
+  // look it up here so the UI can label them without a second round-trip.
+  const requestsById = new Map(requests.map(r => [r.id, r]))
+  const enrichedExceptions = exceptions.map(exc => ({
+    ...exc,
+    childName: exc.type === 'booked' ? requestsById.get(exc.sourceLessonRequestId)?.childName ?? '' : '',
+  }))
+  return NextResponse.json({ rules, exceptions: enrichedExceptions })
 }
 
 export async function POST(request: NextRequest) {

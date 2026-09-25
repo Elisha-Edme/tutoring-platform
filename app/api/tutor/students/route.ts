@@ -9,8 +9,9 @@ import {
   createLessonRequest,
 } from '@/lib/sheets'
 import { materializeFirstOccurrence } from '@/lib/booking-completion'
+import { findSchedulingConflict } from '@/lib/availability'
 import { sendEmail, addStudentRequestEmailHtml } from '@/lib/email'
-import { describeLessonRecurrence } from '@/lib/schedule'
+import { describeLessonRecurrence, formatTime } from '@/lib/schedule'
 import type { TutorStudent, LessonRequest } from '@/lib/types'
 import { randomUUID } from 'crypto'
 
@@ -85,6 +86,19 @@ export async function POST(request: NextRequest) {
   }
   if (proposedLessonDate && proposedLessonStartTime >= proposedLessonEndTime) {
     return NextResponse.json({ error: 'End time must be after start time.' }, { status: 400 })
+  }
+  if (proposedLessonDate) {
+    const conflict = await findSchedulingConflict(session.userId, {
+      requestedDate: proposedLessonDate, requestedStartTime: proposedLessonStartTime, requestedEndTime: proposedLessonEndTime,
+      repeatType: proposedRepeatType, repeatInterval: proposedRepeatInterval, repeatDays: proposedRepeatDays,
+      endsType: proposedEndsType, endsDate: proposedEndsDate, endsAfterCount: proposedEndsAfterCount,
+    })
+    if (conflict) {
+      return NextResponse.json(
+        { error: `That conflicts with your own schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+        { status: 409 },
+      )
+    }
   }
 
   // Verify the child actually belongs to that parent.

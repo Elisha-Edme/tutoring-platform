@@ -152,6 +152,10 @@ interface Props {
   onRespond: (lessonRequestId: string, occurrenceDate: string, action: 'approve' | 'decline') => Promise<void>
   onCancel: (lessonRequestId: string, occurrenceDate: string, note: string) => Promise<void>
   submitting: boolean
+  // 'popup' (the Calendar view's detail popup) gets larger, pill-shaped
+  // buttons — a bigger surface than the Box view's inline row, so the
+  // default compact text-xs buttons look undersized there.
+  variant?: 'compact' | 'popup'
 }
 
 // The interactive part of a single upcoming-lesson card — proposed-time
@@ -159,8 +163,18 @@ interface Props {
 // inline per row) and the Calendar view (rendered inside a detail popup),
 // so both surfaces offer the same actions instead of the calendar being
 // read-only.
-export default function ParentLessonActions({ lesson: l, onPropose, onRespond, onCancel, submitting }: Props) {
+export default function ParentLessonActions({ lesson: l, onPropose, onRespond, onCancel, submitting, variant = 'compact' }: Props) {
   const [mode, setMode] = useState<Mode>(null)
+  const isPopup = variant === 'popup'
+  const primaryBtn = isPopup
+    ? 'text-sm bg-gray-900 text-white px-4 py-2 rounded-full hover:bg-gray-700 transition disabled:opacity-50'
+    : 'text-xs bg-gray-900 text-white px-2.5 py-1 rounded-md hover:bg-gray-700 transition disabled:opacity-50'
+  const secondaryBtn = isPopup
+    ? 'text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:border-gray-500 transition disabled:opacity-50'
+    : 'text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition disabled:opacity-50'
+  const linkBtn = isPopup
+    ? 'text-sm text-gray-600 underline hover:text-gray-900'
+    : 'text-xs text-gray-500 underline hover:text-gray-800'
 
   return (
     <>
@@ -174,18 +188,10 @@ export default function ParentLessonActions({ lesson: l, onPropose, onRespond, o
             Tutor suggested {formatLessonDate(l.proposedDate)}, {formatTime(l.proposedStartTime!)}–{formatTime(l.proposedEndTime!)} EST
           </p>
           <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'approve')}
-              disabled={submitting}
-              className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-            >
+            <button onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'approve')} disabled={submitting} className={primaryBtn}>
               Approve
             </button>
-            <button
-              onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'decline')}
-              disabled={submitting}
-              className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-md hover:border-gray-500 transition disabled:opacity-50"
-            >
+            <button onClick={() => onRespond(l.lessonRequestId, l.templateDate, 'decline')} disabled={submitting} className={secondaryBtn}>
               Decline
             </button>
           </div>
@@ -213,17 +219,17 @@ export default function ParentLessonActions({ lesson: l, onPropose, onRespond, o
             onSubmit={async note => { await onCancel(l.lessonRequestId, l.templateDate, note); setMode(null) }}
           />
         ) : (
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
+          <div className={`flex items-center gap-3 flex-wrap ${isPopup ? 'mt-3' : 'mt-2'}`}>
+            <button onClick={() => setMode('cancel')} className={isPopup ? secondaryBtn : linkBtn}>
+              Cancel
+            </button>
             {l.canPropose ? (
-              <button onClick={() => setMode('propose')} className="text-xs text-gray-500 underline hover:text-gray-800">
+              <button onClick={() => setMode('propose')} className={linkBtn}>
                 Suggest a new time
               </button>
             ) : (
               <p className="text-xs text-gray-400">Within 48 hours — you can still cancel, but rescheduling isn&rsquo;t available.</p>
             )}
-            <button onClick={() => setMode('cancel')} className="text-xs text-gray-500 underline hover:text-gray-800">
-              Cancel
-            </button>
           </div>
         )
       )}

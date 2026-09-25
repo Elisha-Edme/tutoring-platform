@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { getLessonRequestById, updateLessonRequest, getParentProfile } from '@/lib/sheets'
 import { materializeFirstOccurrence } from '@/lib/booking-completion'
+import { findSchedulingConflict } from '@/lib/availability'
+import { formatTime } from '@/lib/schedule'
 import { sendEmail, lessonConfirmedEmailHtml } from '@/lib/email'
 
 // Tutor-only: graduates a negotiated request into a real, trackable lesson.
@@ -26,6 +28,16 @@ export async function POST(
   }
   if (existing.acceptedAt) {
     return NextResponse.json({ error: 'Already accepted.' }, { status: 400 })
+  }
+
+  // Another request may have been accepted for an overlapping time since
+  // this one came in — re-check before graduating it into a live lesson.
+  const conflict = await findSchedulingConflict(existing.tutorUserId, existing)
+  if (conflict) {
+    return NextResponse.json(
+      { error: `That time is no longer free — conflicts with your schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
+      { status: 409 },
+    )
   }
 
   const updated = await updateLessonRequest(id, { acceptedAt: new Date().toISOString() })

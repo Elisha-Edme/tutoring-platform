@@ -1,20 +1,24 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { TutorAvailabilityRule } from '@/lib/types'
+import type { TutorAvailabilityRule, AvailabilityException } from '@/lib/types'
 import { formatTime } from '@/lib/schedule'
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+// Exported for AdminWeeklyScheduleGrid.tsx's read-only reuse — keeping the
+// slot/day math in one place avoids a second copy silently drifting out of
+// sync with this one (see the TimePicker minute-desync bug this exact class
+// of copy-paste risk caused elsewhere in this app).
+export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+export const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-const START_HOUR = 7   // 7 AM
-const END_HOUR = 22    // 10 PM (exclusive)
-const SLOT_MIN = 30
-const TOTAL_SLOTS = (END_HOUR - START_HOUR) * (60 / SLOT_MIN) // 30
+export const START_HOUR = 7   // 7 AM
+export const END_HOUR = 22    // 10 PM (exclusive)
+export const SLOT_MIN = 30
+export const TOTAL_SLOTS = (END_HOUR - START_HOUR) * (60 / SLOT_MIN) // 30
 
 function pad2(n: number) { return String(n).padStart(2, '0') }
 
-function slotToHHMM(slot: number): string {
+export function slotToHHMM(slot: number): string {
   const mins = START_HOUR * 60 + slot * SLOT_MIN
   return `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`
 }
@@ -24,7 +28,7 @@ function hhmmToSlot(hhmm: string): number {
   return (h - START_HOUR) * (60 / SLOT_MIN) + Math.floor(m / SLOT_MIN)
 }
 
-function rulesToSelected(rules: TutorAvailabilityRule[]): Set<string> {
+export function rulesToSelected(rules: TutorAvailabilityRule[]): Set<string> {
   const s = new Set<string>()
   for (const rule of rules) {
     const start = Math.max(0, hhmmToSlot(rule.startTime))
@@ -36,6 +40,29 @@ function rulesToSelected(rules: TutorAvailabilityRule[]): Set<string> {
     }
   }
   return s
+}
+
+// Collapses 'booked' exceptions (recurring lesson commitments, see
+// materializeFirstOccurrence in lib/booking-completion.ts) onto the same
+// day-of-week/slot grid as rulesToSelected. Only 'daily'/'weekly'/'biweekly'
+// map cleanly onto a *weekly* grid cell — a monthly/yearly booking doesn't
+// occupy that slot every week, so showing it as a permanent block here would
+// be misleading; it still shows correctly in the Exceptions list below.
+export function bookedToSelected(exceptions: AvailabilityException[]): Map<string, string> {
+  const m = new Map<string, string>() // key -> childName label
+  for (const exc of exceptions) {
+    if (exc.type !== 'booked') continue
+    const label = (exc as AvailabilityException & { childName?: string }).childName || 'Booked'
+    const start = Math.max(0, hhmmToSlot(exc.startTime))
+    const end = Math.min(TOTAL_SLOTS, hhmmToSlot(exc.endTime))
+    const days = exc.repeatType === 'daily' ? DAYS : exc.repeatDays
+    for (const day of days) {
+      const d = DAYS.indexOf(day)
+      if (d === -1) continue
+      for (let slot = start; slot < end; slot++) m.set(`${d}:${slot}`, label)
+    }
+  }
+  return m
 }
 
 interface Block { dayIndex: number; startSlot: number; endSlot: number }
@@ -78,7 +105,10 @@ function InlineTimePicker({ value, onChange }: { value: string; onChange: (v: st
   const lastCommittedRef = useRef(mStr)
 
   useEffect(() => {
-    if (mStr !== lastCommittedRef.current) setMDisplay(mStr)
+    if (mStr !== lastCommittedRef.current) {
+      setMDisplay(mStr)
+      lastCommittedRef.current = mStr
+    }
   }, [mStr])
 
   const commit = (nh12: number, nm: string, nAmpm: string) => {
@@ -152,13 +182,15 @@ interface TimeOverride { startTime: string; endTime: string }
 
 interface Props {
   initialRules: TutorAvailabilityRule[]
+  bookedExceptions?: AvailabilityException[]
   onSave: (blocks: ScheduleBlock[]) => Promise<void>
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function WeeklyAvailabilityGrid({ initialRules, onSave }: Props) {
+export default function WeeklyAvailabilityGrid({ initialRules, bookedExceptions = [], onSave }: Props) {
   const [selected, setSelected] = useState<Set<string>>(() => rulesToSelected(initialRules))
+  const booked = bookedToSelected(bookedExceptions)
   const [drag, setDrag] = useState<{
     day: number; start: number; current: number; mode: 'add' | 'remove'
   } | null>(null)
@@ -212,6 +244,9 @@ export default function WeeklyAvailabilityGrid({ initialRules, onSave }: Props) 
     const inDrag = dragCells.has(key)
     const isSel = selected.has(key)
     if (inDrag && drag) return drag.mode === 'add' ? 'bg-green-200' : 'bg-rose-200'
+    // Booked always wins visually — a lesson commitment is fixed, unlike the
+    // tutor's own available/unavailable marking underneath it.
+    if (booked.has(key)) return 'bg-blue-400 hover:bg-blue-500'
     return isSel ? 'bg-green-400 hover:bg-green-500' : 'bg-rose-50 hover:bg-rose-100'
   }
 
@@ -279,6 +314,12 @@ export default function WeeklyAvailabilityGrid({ initialRules, onSave }: Props) 
     <div className="flex gap-6">
       {/* Grid */}
       <div className="flex-1 select-none overflow-x-auto">
+        {booked.size > 0 && (
+          <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-500">
+            <span className="inline-block w-3 h-3 rounded-sm bg-blue-400" />
+            Booked with a student — hover a cell for details
+          </div>
+        )}
         <div className="inline-flex min-w-full">
           {/* Time labels */}
           <div className="w-16 shrink-0">
@@ -306,6 +347,7 @@ export default function WeeklyAvailabilityGrid({ initialRules, onSave }: Props) 
               {Array.from({ length: TOTAL_SLOTS }, (_, s) => (
                 <div
                   key={s}
+                  title={booked.get(`${d}:${s}`) ? `Booked: ${booked.get(`${d}:${s}`)}` : undefined}
                   className={`h-5 cursor-pointer transition-colors ${cellBg(d, s)} ${
                     s % 2 === 0 ? 'border-t border-gray-300' : 'border-t border-gray-100'
                   }`}
@@ -333,7 +375,7 @@ export default function WeeklyAvailabilityGrid({ initialRules, onSave }: Props) 
           </p>
           {blocks.length === 0 ? (
             <p className="text-xs text-gray-400 leading-relaxed">
-              Click or drag on the grid to mark when you're free.
+              Click or drag on the grid to mark when you&rsquo;re free.
             </p>
           ) : (
             <div className="space-y-3">
