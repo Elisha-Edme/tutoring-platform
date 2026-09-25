@@ -24,7 +24,11 @@ export default function SignInForm() {
 
     const data = await res.json()
     if (res.ok) {
-      router.push(data.role === 'tutor' ? '/dashboard/tutor' : '/dashboard/parent')
+      router.push(
+        data.role === 'admin' ? '/admin' :
+        data.role === 'tutor' ? '/dashboard/tutor' :
+        '/dashboard/parent',
+      )
       router.refresh()
     } else {
       setStatus('error')

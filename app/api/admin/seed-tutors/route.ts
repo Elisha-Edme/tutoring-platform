@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
+import { getSession } from '@/lib/auth'
 import { getUserByEmail, createUser, createTutorProfile } from '@/lib/sheets'
 import { SEED_TUTORS } from '@/lib/tutor-seed-data'
 import { DEFAULT_TUTOR_PASSWORD, DEFAULT_AVATAR_URL } from '@/lib/constants'
 
 export async function POST() {
+  const session = await getSession()
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const results: { name: string; status: 'created' | 'skipped' }[] = []
 
   for (const tutor of SEED_TUTORS) {

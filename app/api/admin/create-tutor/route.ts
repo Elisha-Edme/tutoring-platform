@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
+import { getSession } from '@/lib/auth'
 import { getUserByEmail, createUser, createTutorProfile } from '@/lib/sheets'
 import { DEFAULT_TUTOR_PASSWORD, DEFAULT_AVATAR_URL } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
+  const session = await getSession()
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const { name, email, instruments, bio, school, credentials, location } = body

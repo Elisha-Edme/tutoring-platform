@@ -4,7 +4,10 @@ import SignOutButton from './SignOutButton'
 
 export default async function Navbar() {
   const session = await getSession()
-  const dashboardHref = session?.role === 'tutor' ? '/dashboard/tutor' : '/dashboard/parent'
+  const dashboardHref =
+    session?.role === 'admin' ? '/admin' :
+    session?.role === 'tutor' ? '/dashboard/tutor' :
+    '/dashboard/parent'
 
   return (
     <nav className="w-full border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
