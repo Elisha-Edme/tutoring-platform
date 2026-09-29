@@ -8,7 +8,7 @@ export default async function AdminPage() {
   const links = [
     { href: '/admin/tutors', label: 'Tutors', desc: 'Profiles, availability, students, requests, lesson history' },
     { href: '/admin/parents', label: 'Parents', desc: 'Profiles, children, requests, lesson history' },
-    { href: '/admin/create-tutor', label: 'Create tutor', desc: 'Add a new tutor account, or seed the demo roster' },
+    { href: '/admin/create-tutor', label: 'Invite tutor', desc: 'Invite a new tutor by email' },
   ]
 
   return (

@@ -199,6 +199,23 @@ export function tutorSummaryReminderEmailHtml({
 </div>`
 }
 
+export function tutorInviteEmailHtml({ signupUrl }: { signupUrl: string }): string {
+  return `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111">
+  <h2 style="font-size:20px;margin-bottom:4px">You're invited to join as a tutor</h2>
+  <p style="color:#555;margin-top:0">
+    An admin has invited you to join Tune Up Together as a tutor. Click below to set up your profile and password.
+  </p>
+  <p style="margin-top:0">
+    <a href="${signupUrl}" style="display:inline-block;background:#111;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-top:8px">
+      Complete your signup
+    </a>
+  </p>
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
+  <p style="color:#aaa;font-size:12px">Tune Up Together · tutoio.app@gmail.com</p>
+</div>`
+}
+
 export function lessonSummaryReadyEmailHtml({
   parentName, tutorName, childName, occurrenceDate, summary, dashboardUrl,
 }: {

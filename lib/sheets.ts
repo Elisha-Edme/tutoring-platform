@@ -2,7 +2,7 @@ import { google } from 'googleapis'
 import type {
   User, TutorProfile, ParentProfile, Child,
   TutorAvailabilityRule, AvailabilityException, LessonRequest, TutorStudent, Review,
-  LessonOccurrence,
+  LessonOccurrence, TutorInvite,
 } from './types'
 
 function getPrivateKey(): string {
@@ -295,15 +295,23 @@ async function deleteRowsWhere(tab: string, colIndex: number, value: string): Pr
   return matches.length
 }
 
-export async function deleteTutorByEmail(email: string): Promise<{ users: number; tutors: number }> {
-  const users = await deleteRowsWhere('Users', 1, email)
-  const tutors = await deleteRowsWhere('TutorProfiles', 1, email)
-  return { users, tutors }
-}
-
-// For non-tutor accounts (e.g. admin) that have no TutorProfiles row to clean up.
-export async function deleteUserByEmail(email: string): Promise<number> {
-  return deleteRowsWhere('Users', 1, email)
+// Removes a tutor and everything keyed to them. Dependent rows go first and the
+// profile/user rows last: every step is idempotent, so if one fails partway the
+// tutor is still listed and the admin can simply retry — the other order would
+// strand the remaining data behind an account nobody can see anymore.
+export async function deleteTutorAndData(tutorUserId: string, email: string) {
+  const deleted = {
+    reviews: await deleteRowsWhere('Reviews', 1, tutorUserId),
+    lessons: await deleteRowsWhere('Lessons', 2, tutorUserId),
+    lessonRequests: await deleteRowsWhere('LessonRequests', 3, tutorUserId),
+    students: await deleteRowsWhere('TutorStudents', 0, tutorUserId),
+    exceptions: await deleteRowsWhere('AvailabilityExceptions', 1, tutorUserId),
+    availability: await deleteRowsWhere('TutorAvailability', 1, tutorUserId),
+    invites: await deleteRowsWhere('TutorInvites', 1, email),
+  }
+  await deleteRowsWhere('TutorProfiles', 0, tutorUserId)
+  await deleteRowsWhere('Users', 0, tutorUserId)
+  return deleted
 }
 
 // ── TutorAvailability ─────────────────────────────────────────────────────────
@@ -749,6 +757,57 @@ export async function getReviewByTutorAndParent(tutorUserId: string, parentUserI
   const rows = await getDataRows('Reviews')
   const row = rows.find(r => r[1] === tutorUserId && r[2] === parentUserId)
   return row ? rowToReview(row) : null
+}
+
+// ── TutorInvites ─────────────────────────────────────────────────────────────
+// Columns: token, email, createdAt, usedAt
+// usedAt === '' means pending — see TutorInvite in lib/types.ts.
+
+function rowToTutorInvite(row: string[]): TutorInvite {
+  return { token: row[0], email: row[1] ?? '', createdAt: row[2] ?? '', usedAt: row[3] ?? '' }
+}
+
+function tutorInviteToRow(inv: TutorInvite): string[] {
+  return [inv.token, inv.email, inv.createdAt, inv.usedAt]
+}
+
+export async function createTutorInvite(invite: TutorInvite): Promise<void> {
+  await appendRow('TutorInvites', tutorInviteToRow(invite))
+}
+
+export async function getTutorInviteByToken(token: string): Promise<TutorInvite | null> {
+  const rows = await getDataRows('TutorInvites')
+  const row = rows.find(r => r[0] === token)
+  return row ? rowToTutorInvite(row) : null
+}
+
+// Only matches a still-unused row — lets re-inviting the same address reuse
+// and resend the same link instead of piling up duplicate rows.
+export async function getPendingTutorInviteByEmail(email: string): Promise<TutorInvite | null> {
+  const rows = await getDataRows('TutorInvites')
+  const row = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase() && !r[3])
+  return row ? rowToTutorInvite(row) : null
+}
+
+export async function getAllTutorInvites(): Promise<TutorInvite[]> {
+  const rows = await getDataRows('TutorInvites')
+  return rows.filter(r => r.length > 0 && r[0]).map(rowToTutorInvite)
+}
+
+export async function markTutorInviteUsed(token: string): Promise<TutorInvite | null> {
+  const rows = await getDataRows('TutorInvites')
+  const i = rows.findIndex(r => r[0] === token)
+  if (i === -1) return null
+  const updated: TutorInvite = { ...rowToTutorInvite(rows[i]), usedAt: new Date().toISOString() }
+  const sheets = await getSheets()
+  const r = i + 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID(),
+    range: `TutorInvites!A${r}:D${r}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [tutorInviteToRow(updated)] },
+  })
+  return updated
 }
 
 // One-time migration: overwrite the passwordHash column (E) for every tutor row

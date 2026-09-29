@@ -9,6 +9,7 @@ import {
   getOccurrencesByTutor,
   getReviewsByTutor,
   getParentProfile,
+  deleteTutorAndData,
 } from '@/lib/sheets'
 import { computeTutorStats } from '@/lib/lessons'
 import { describeRule, describeLessonRecurrence } from '@/lib/schedule'
@@ -98,4 +99,30 @@ export async function GET(
     lessonRequests: enrichedRequests,
     history: enrichedHistory,
   })
+}
+
+// Permanently removes the tutor and everything tied to them (availability,
+// students, lesson requests + history, reviews). Parents lose those lessons
+// from their own dashboards too — the admin UI spells this out before calling.
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ tutorUserId: string }> },
+) {
+  const session = await getSession()
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { tutorUserId } = await params
+  try {
+    // Keyed on a real tutor profile so this can never remove an admin or parent account.
+    const profile = await getTutorByUserId(tutorUserId)
+    if (!profile) return NextResponse.json({ error: 'Not found.' }, { status: 404 })
+
+    const deleted = await deleteTutorAndData(tutorUserId, profile.email)
+    return NextResponse.json({ ok: true, deleted })
+  } catch (err) {
+    console.error('[admin/tutors] DELETE', err)
+    return NextResponse.json({ error: 'Failed to delete this tutor. Please try again.' }, { status: 500 })
+  }
 }

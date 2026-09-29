@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { upload } from '@vercel/blob/client'
 import type { TutorProfileWithStats } from '@/lib/types'
-import { TUTOR_INSTRUMENTS, MAX_PHOTO_SIZE_BYTES } from '@/lib/constants'
+import { INSTRUMENTS, MAX_PHOTO_SIZE_BYTES } from '@/lib/constants'
 import { toDisplayImageUrl } from '@/lib/images'
 import { formatHours } from '@/lib/lessons'
 import AvailabilityEditor from './AvailabilityEditor'
@@ -193,7 +193,7 @@ export default function TutorProfilePanel() {
         {editingInstruments ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              {TUTOR_INSTRUMENTS.map(inst => {
+              {INSTRUMENTS.map(inst => {
                 const on = instrDraft.includes(inst)
                 return (
                   <button key={inst} type="button" onClick={() => toggleInstrument(inst)}

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GRADES, CHILD_INSTRUMENTS } from '@/lib/constants'
+import { GRADES, INSTRUMENTS } from '@/lib/constants'
 
 interface Child {
   name: string
@@ -130,7 +130,7 @@ export default function SignUpForm() {
               <div>
                 <p className="text-xs text-gray-500 mb-2">Instrument(s) — select all that apply</p>
                 <div className="flex flex-wrap gap-2">
-                  {CHILD_INSTRUMENTS.map(inst => {
+                  {INSTRUMENTS.map(inst => {
                     const selected = child.instruments.includes(inst)
                     return (
                       <button
