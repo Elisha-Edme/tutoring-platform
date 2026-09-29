@@ -1,5 +1,4 @@
 import { google } from 'googleapis'
-import { credential } from './env'
 import type {
   User, TutorProfile, ParentProfile, Child,
   TutorAvailabilityRule, AvailabilityException, LessonRequest, TutorStudent, Review,
@@ -8,17 +7,16 @@ import type {
 
 function getPrivateKey(): string {
   // Prefer base64-encoded key (avoids all newline escaping issues on Vercel)
-  const b64 = credential('GOOGLE_PRIVATE_KEY_B64')
-  if (b64) {
-    return Buffer.from(b64, 'base64').toString('utf-8')
+  if (process.env.GOOGLE_PRIVATE_KEY_B64) {
+    return Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf-8')
   }
-  return (credential('GOOGLE_PRIVATE_KEY') ?? '').replace(/\\n/g, '\n')
+  return (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n')
 }
 
 function getAuth() {
   return new google.auth.GoogleAuth({
     credentials: {
-      client_email: credential('GOOGLE_SERVICE_ACCOUNT_EMAIL'),
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       private_key: getPrivateKey(),
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -35,26 +33,7 @@ async function getSheets() {
   return sheetsClient
 }
 
-const SHEET_ID = () => credential('GOOGLE_SHEET_ID')!
-
-const EXPECTED_TABS = [
-  'Users', 'TutorProfiles', 'ParentProfiles', 'Children', 'TutorAvailability',
-  'AvailabilityExceptions', 'LessonRequests', 'TutorStudents', 'Lessons', 'Reviews', 'TutorInvites',
-]
-
-// Read-only: confirms the credentials authenticate and every tab the code relies on exists.
-export async function checkSpreadsheet(): Promise<{ title: string; missingTabs: string[] }> {
-  const sheets = await getSheets()
-  const res = await sheets.spreadsheets.get({
-    spreadsheetId: SHEET_ID(),
-    fields: 'properties.title,sheets.properties.title',
-  })
-  const present = new Set((res.data.sheets ?? []).map(s => s.properties?.title))
-  return {
-    title: res.data.properties?.title ?? '',
-    missingTabs: EXPECTED_TABS.filter(t => !present.has(t)),
-  }
-}
+const SHEET_ID = () => process.env.GOOGLE_SHEET_ID!
 
 // Coalesces truly concurrent reads of the same tab into one API call — e.g. a
 // dashboard whose several panels each independently fetch and happen to both
