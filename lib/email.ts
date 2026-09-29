@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { credential } from './env'
 
 interface EmailPayload {
   to: string
@@ -11,16 +12,22 @@ function getTransport() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: credential('GMAIL_USER'),
+      pass: credential('GMAIL_APP_PASSWORD'),
     },
   })
+}
+
+// Authenticates against Gmail SMTP without sending anything.
+export async function verifyEmailTransport(): Promise<{ user: string }> {
+  await getTransport().verify()
+  return { user: credential('GMAIL_USER') ?? '' }
 }
 
 export async function sendEmail({ to, replyTo, subject, html }: EmailPayload): Promise<void> {
   const transport = getTransport()
   await transport.sendMail({
-    from: `"Tune Up Together" <${process.env.GMAIL_USER}>`,
+    from: `"Tune Up Together" <${credential('GMAIL_USER')}>`,
     to,
     ...(replyTo ? { replyTo } : {}),
     subject,
