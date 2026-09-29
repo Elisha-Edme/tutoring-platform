@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import type { TutorProfileWithStats } from '@/lib/types'
-import { TUTOR_INSTRUMENTS } from '@/lib/constants'
+import { INSTRUMENTS } from '@/lib/constants'
 import { getTutorGradient } from '@/lib/gradient'
 import { formatHours } from '@/lib/lessons'
 import BookingModal from './BookingModal'
 import TutorDetailCard, { Avatar } from './TutorDetailCard'
 import StarRating from '@/components/StarRating'
-
-const INSTRUMENTS = ['All', ...TUTOR_INSTRUMENTS]
 
 interface TutorCardProps {
   tutor: TutorProfileWithStats
@@ -88,8 +86,12 @@ export default function TutorGrid({ isParent, isSignedIn }: { isParent?: boolean
   if (loading) return <p className="text-gray-400 text-sm">Loading tutors…</p>
   if (hasError) return <p className="text-gray-400 text-sm">Couldn&apos;t load tutors. Please refresh.</p>
   if (tutors.length === 0) {
-    return <p className="text-gray-400 text-sm">No tutors yet. Use the admin panel to seed tutors.</p>
+    return <p className="text-gray-400 text-sm">No tutors yet. Check back soon.</p>
   }
+
+  // Only offer filters that match at least one tutor — the full instrument
+  // list is long, and most entries would just lead to an empty result.
+  const filters = ['All', ...INSTRUMENTS.filter(i => tutors.some(t => t.instruments.includes(i)))]
 
   const q = query.trim().toLowerCase()
   const visible = tutors.filter(t => {
@@ -109,7 +111,7 @@ export default function TutorGrid({ isParent, isSignedIn }: { isParent?: boolean
       />
 
       <div className="flex gap-2 flex-wrap mb-4">
-        {INSTRUMENTS.map(inst => (
+        {filters.map(inst => (
           <button
             key={inst}
             onClick={() => setFilter(inst)}

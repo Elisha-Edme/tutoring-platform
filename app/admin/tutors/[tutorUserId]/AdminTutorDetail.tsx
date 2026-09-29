@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type {
   TutorProfile, TutorAvailabilityRule, AvailabilityException,
   LessonRequest, LessonOccurrence, TutorStudent,
@@ -66,11 +67,17 @@ const EmptyState = ({ text }: { text: string }) => (
   </div>
 )
 
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
+
 export default function AdminTutorDetail({ tutorUserId }: { tutorUserId: string }) {
+  const router = useRouter()
   const [detail, setDetail] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     fetch(`/api/admin/tutors/${tutorUserId}`)
@@ -85,6 +92,20 @@ export default function AdminTutorDetail({ tutorUserId }: { tutorUserId: string 
 
   const { profile, stats, availability, students, lessonRequests, history } = detail
 
+  const handleDelete = async () => {
+    setDeleting(true)
+    setDeleteError('')
+    const res = await fetch(`/api/admin/tutors/${tutorUserId}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.push('/admin/tutors')
+      router.refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setDeleteError(d.error ?? 'Failed to delete this tutor.')
+      setDeleting(false)
+    }
+  }
+
   const tabCls = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-full transition ${
       tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'
@@ -94,16 +115,58 @@ export default function AdminTutorDetail({ tutorUserId }: { tutorUserId: string 
     <div>
       <Link href="/admin/tutors" className="text-sm text-gray-500 hover:text-gray-800">&larr; Back to tutors</Link>
 
-      <div className="flex items-center gap-4 mt-4 mb-8">
-        <div className="rounded-full" style={{ background: getTutorGradient(profile.userId) }}>
-          <Avatar name={profile.name} url={profile.photoUrl} size="lg" />
+      <div className="flex items-center justify-between gap-4 mt-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div className="rounded-full" style={{ background: getTutorGradient(profile.userId) }}>
+            <Avatar name={profile.name} url={profile.photoUrl} size="lg" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{profile.name}</h1>
+            <p className="text-sm text-gray-500">{profile.email}</p>
+            <p className="text-sm text-gray-500">{profile.instruments.join(', ')}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{profile.name}</h1>
-          <p className="text-sm text-gray-500">{profile.email}</p>
-          <p className="text-sm text-gray-500">{profile.instruments.join(', ')}</p>
-        </div>
+        {!confirmingDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="text-sm text-red-600 border border-red-200 px-3 py-1.5 rounded-md hover:bg-red-50 transition shrink-0"
+          >
+            Delete tutor
+          </button>
+        )}
       </div>
+
+      {confirmingDelete && (
+        <div className="border border-red-200 bg-red-50 rounded-xl p-4 mb-8">
+          <p className="text-sm font-medium text-gray-900 mb-1">Delete {profile.name}?</p>
+          <p className="text-sm text-gray-600 mb-3">
+            This permanently deletes their account, availability, and{' '}
+            {plural(students.length, 'student')}, {plural(lessonRequests.length, 'lesson request')},{' '}
+            {plural(history.length, 'lesson')} of history, and {plural(stats.reviewCount, 'review')}.
+            Parents lose those lessons from their dashboards too. This can&rsquo;t be undone.
+          </p>
+          {deleteError && <p className="text-sm text-red-600 mb-3">{deleteError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-sm bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 transition disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Delete permanently'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setConfirmingDelete(false); setDeleteError('') }}
+              disabled={deleting}
+              className="text-sm text-gray-600 hover:text-gray-900 px-2 py-1.5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6 flex-wrap">
         <button onClick={() => setTab('overview')} className={tabCls('overview')}>Overview</button>

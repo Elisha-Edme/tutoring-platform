@@ -1,66 +1,46 @@
 'use client'
 
-import { useState } from 'react'
-
-const INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Trumpet', 'Drums', 'Flute', 'Alto Saxophone', 'Tuba', 'Trombone']
-
-interface SeedResult {
-  name: string
-  status: 'created' | 'skipped'
-}
+import { useState, useEffect } from 'react'
+import type { TutorInvite } from '@/lib/types'
 
 export default function CreateTutorForm() {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [selectedInstruments, setSelectedInstruments] = useState<string[]>([])
-  const [bio, setBio] = useState('')
-  const [school, setSchool] = useState('')
-  const [credentials, setCredentials] = useState('')
-  const [location, setLocation] = useState('')
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [inviteError, setInviteError] = useState('')
+  const [invites, setInvites] = useState<TutorInvite[]>([])
+  const [loadingInvites, setLoadingInvites] = useState(true)
+  const [invitesError, setInvitesError] = useState('')
 
-  const [seedStatus, setSeedStatus] = useState<'idle' | 'loading' | 'done'>('idle')
-  const [seedResults, setSeedResults] = useState<SeedResult[]>([])
-
-  const toggleInstrument = (inst: string) => {
-    setSelectedInstruments(prev =>
-      prev.includes(inst) ? prev.filter(i => i !== inst) : [...prev, inst]
-    )
+  const loadInvites = () => {
+    return fetch('/api/admin/tutor-invites')
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(d => { setInvites(d.invites ?? []); setInvitesError('') })
+      .catch(() => setInvitesError('Failed to load invites.'))
+      .finally(() => setLoadingInvites(false))
   }
 
-  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (selectedInstruments.length === 0) {
-      setStatus('error')
-      setErrorMsg('Select at least one instrument.')
-      return
-    }
-    setStatus('loading')
-    setErrorMsg('')
+  useEffect(() => { loadInvites() }, [])
 
-    const res = await fetch('/api/admin/create-tutor', {
+  const handleInvite = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setInviteStatus('loading')
+    setInviteError('')
+
+    const res = await fetch('/api/admin/tutor-invites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, instruments: selectedInstruments, bio, school, credentials, location }),
+      body: JSON.stringify({ email: inviteEmail }),
     })
 
     const data = await res.json()
     if (res.ok) {
-      setStatus('success')
-      setName(''); setEmail(''); setSelectedInstruments([]); setBio(''); setSchool(''); setCredentials(''); setLocation('')
+      setInviteStatus('success')
+      setInviteEmail('')
+      await loadInvites()
     } else {
-      setStatus('error')
-      setErrorMsg(data.error ?? 'Something went wrong.')
+      setInviteStatus('error')
+      setInviteError(data.error ?? 'Something went wrong.')
     }
-  }
-
-  const handleSeed = async () => {
-    setSeedStatus('loading')
-    const res = await fetch('/api/admin/seed-tutors', { method: 'POST' })
-    const data = await res.json()
-    setSeedResults(data.results ?? [])
-    setSeedStatus('done')
   }
 
   return (
@@ -68,100 +48,50 @@ export default function CreateTutorForm() {
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Admin — Tutor Management</h1>
       <p className="text-gray-500 mb-10 text-sm">This page is not publicly linked.</p>
 
-      <section className="border border-gray-200 rounded-xl p-6 mb-10">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Seed all 10 Tune Up Together tutors</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Populates Google Sheets with all 10 known tutors in one click. Skips any already added.
-        </p>
-        <button onClick={handleSeed} disabled={seedStatus === 'loading'}
-          className="bg-gray-900 text-white px-5 py-2 rounded-md text-sm hover:bg-gray-700 transition disabled:opacity-50">
-          {seedStatus === 'loading' ? 'Seeding...' : 'Seed tutors'}
-        </button>
-
-        {seedStatus === 'done' && seedResults.length > 0 && (
-          <ul className="mt-4 space-y-1 text-sm">
-            {seedResults.map(r => (
-              <li key={r.name} className={r.status === 'created' ? 'text-green-600' : 'text-gray-400'}>
-                {r.status === 'created' ? '✓' : '–'} {r.name} ({r.status})
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Add a single tutor</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Invite a tutor</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          They&rsquo;ll get an email with a link to set up their own profile and password.
+        </p>
 
-        {status === 'success' && <p className="text-green-600 text-sm mb-4">Tutor created successfully.</p>}
+        {inviteStatus === 'success' && <p className="text-green-600 text-sm mb-4">Invite sent.</p>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)}
-                placeholder="Navin Vasudev"
-                className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="tutor@example.com"
-                className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Instruments</label>
-            <div className="flex flex-wrap gap-2">
-              {INSTRUMENTS.map(inst => (
-                <button key={inst} type="button" onClick={() => toggleInstrument(inst)}
-                  className={`px-3 py-1 rounded-full text-sm border transition ${
-                    selectedInstruments.includes(inst)
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'border-gray-300 text-gray-600 hover:border-gray-500'
-                  }`}>
-                  {inst}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Credentials</label>
-            <input type="text" value={credentials} onChange={e => setCredentials(e.target.value)}
-              placeholder="8 years playing, NYSSMA Level 5"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">School</label>
-              <input type="text" value={school} onChange={e => setSchool(e.target.value)}
-                placeholder="Local High School"
-                className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <input type="text" value={location} onChange={e => setLocation(e.target.value)}
-                placeholder="Greater New York Area"
-                className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3}
-              placeholder="A short bio..."
-              className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-          </div>
-
-          {status === 'error' && <p className="text-sm text-red-600">{errorMsg}</p>}
-
-          <button type="submit" disabled={status === 'loading'}
-            className="w-full bg-gray-900 text-white py-3 rounded-md text-sm font-medium hover:bg-gray-700 transition disabled:opacity-50">
-            {status === 'loading' ? 'Creating...' : 'Create tutor'}
+        <form onSubmit={handleInvite} className="flex gap-2 mb-4">
+          <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+            placeholder="tutor@example.com"
+            className="flex-1 border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+          <button type="submit" disabled={inviteStatus === 'loading'}
+            className="bg-gray-900 text-white px-5 py-2 rounded-md text-sm hover:bg-gray-700 transition disabled:opacity-50 shrink-0">
+            {inviteStatus === 'loading' ? 'Sending...' : 'Send invite'}
           </button>
         </form>
+
+        {inviteStatus === 'error' && <p className="text-sm text-red-600 mb-4">{inviteError}</p>}
+
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Invites sent</h3>
+        {loadingInvites ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : invitesError ? (
+          <p className="text-sm text-red-600">{invitesError}</p>
+        ) : invites.length === 0 ? (
+          <p className="text-sm text-gray-400">No invites sent yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {invites.map(inv => (
+              <div key={inv.token} className="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-4 py-2.5">
+                <div>
+                  <p className="text-sm text-gray-900">{inv.email}</p>
+                  <p className="text-xs text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${
+                  inv.usedAt ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                }`}>
+                  {inv.usedAt ? 'Signed up' : 'Pending'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

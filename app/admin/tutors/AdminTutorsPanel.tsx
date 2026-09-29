@@ -3,13 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { TutorProfileWithStats } from '@/lib/types'
-import { TUTOR_INSTRUMENTS } from '@/lib/constants'
+import { INSTRUMENTS } from '@/lib/constants'
 import { getTutorGradient } from '@/lib/gradient'
 import { formatHours } from '@/lib/lessons'
 import { Avatar } from '@/app/tutors/TutorDetailCard'
 import StarRating from '@/components/StarRating'
-
-const INSTRUMENTS = ['All', ...TUTOR_INSTRUMENTS]
 
 export default function AdminTutorsPanel() {
   const [tutors, setTutors] = useState<TutorProfileWithStats[]>([])
@@ -30,6 +28,8 @@ export default function AdminTutorsPanel() {
   if (hasError) return <p className="text-gray-400 text-sm">Couldn&apos;t load tutors. Please refresh.</p>
   if (tutors.length === 0) return <p className="text-gray-400 text-sm">No tutors yet.</p>
 
+  const filters = ['All', ...INSTRUMENTS.filter(i => tutors.some(t => t.instruments.includes(i)))]
+
   const q = query.trim().toLowerCase()
   const visible = tutors.filter(t => {
     const matchesInstrument = filter === 'All' || t.instruments.includes(filter)
@@ -48,7 +48,7 @@ export default function AdminTutorsPanel() {
       />
 
       <div className="flex gap-2 flex-wrap mb-4">
-        {INSTRUMENTS.map(inst => (
+        {filters.map(inst => (
           <button
             key={inst}
             onClick={() => setFilter(inst)}

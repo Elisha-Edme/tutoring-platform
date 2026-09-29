@@ -37,6 +37,16 @@ export interface TutorProfile {
   rating: number
 }
 
+// A one-time signup link an admin sends to a prospective tutor's email.
+// usedAt === '' means pending — same orthogonal blank-string-flag idiom as
+// LessonRequest.acceptedAt, not a status enum.
+export interface TutorInvite {
+  token: string
+  email: string
+  createdAt: string
+  usedAt: string
+}
+
 // Returned by GET /api/tutors — lessonsCompleted/hoursCompleted/rating are
 // recomputed fresh from LessonRequests/Reviews (see lib/lessons.ts), overriding
 // the static TutorProfiles columns; reviewCount has no column of its own.
