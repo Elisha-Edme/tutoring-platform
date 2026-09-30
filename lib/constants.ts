@@ -3,6 +3,11 @@
 export const DEFAULT_AVATAR_URL =
   'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y&s=256'
 
+// Lessons and hours from before the platform tracked them. The landing page adds
+// the live completed-lesson totals from the Lessons tab on top of these.
+export const HISTORICAL_LESSONS = 214
+export const HISTORICAL_HOURS = 172
+
 // Cap on a tutor's uploaded profile photo (Vercel Blob).
 export const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
 

@@ -2,12 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { getSession } from '@/lib/auth'
-
-const STATS = [
-  { value: '211', label: 'lessons taught' },
-  { value: '170', label: 'hours completed' },
-  { value: '35', label: 'volunteer tutors' },
-]
+import HomeStats from './HomeStats'
 
 const STEPS = [
   { n: '1', title: 'Browse tutors', body: 'Explore our roster of high school musicians and filter by instrument.' },
@@ -45,17 +40,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y border-gray-100 bg-gray-50">
-        <div className="max-w-3xl mx-auto px-6 py-12 flex justify-center gap-12 sm:gap-20">
-          {STATS.map(s => (
-            <div key={s.label} className="text-center">
-              <p className="text-4xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-sm text-gray-500 mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Stats — fetched client-side; see HomeStats */}
+      <HomeStats />
 
       {/* How it works */}
       <section className="max-w-4xl mx-auto px-6 py-20">

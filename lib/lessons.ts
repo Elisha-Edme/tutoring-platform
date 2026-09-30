@@ -86,6 +86,17 @@ export function computeTutorStats(
   return { lessonsCompleted, hoursCompleted, rating, reviewCount }
 }
 
+// Platform-wide counterpart to computeTutorStats: every completed occurrence,
+// regardless of tutor.
+export function computePlatformTotals(allOccurrences: LessonOccurrence[]): { lessons: number; hours: number } {
+  const completed = allOccurrences.filter(o => o.status === 'completed')
+  const hours = completed.reduce(
+    (sum, o) => sum + lessonDurationHours(o.occurrenceStartTime, o.occurrenceEndTime),
+    0,
+  )
+  return { lessons: completed.length, hours }
+}
+
 // Presentation-only rounding of a raw hours total to ~2 significant figures
 // (2.083333... -> "2.1", 100 -> "100", 0 -> "0"). Only ever call this at
 // render time — never on computeTutorStats' return value or the sheet-
