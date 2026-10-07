@@ -34,6 +34,8 @@ export default function TutorProfilePanel() {
 
   const [editingBio, setEditingBio] = useState(false)
   const [bioDraft, setBioDraft] = useState('')
+  const [editingLocation, setEditingLocation] = useState(false)
+  const [locationDraft, setLocationDraft] = useState('')
   const [editingInstruments, setEditingInstruments] = useState(false)
   const [instrDraft, setInstrDraft] = useState<string[]>([])
 
@@ -52,7 +54,7 @@ export default function TutorProfilePanel() {
       .finally(() => setLoading(false))
   }, [])
 
-  const save = async (patch: { bio?: string; instruments?: string[]; photoUrl?: string }) => {
+  const save = async (patch: { bio?: string; instruments?: string[]; photoUrl?: string; location?: string }) => {
     setSaving(true)
     setError('')
     const res = await fetch('/api/tutor/me', {
@@ -64,6 +66,7 @@ export default function TutorProfilePanel() {
       const data = await res.json()
       setTutor(data.tutor)
       setEditingBio(false)
+      setEditingLocation(false)
       setEditingInstruments(false)
     } else {
       const data = await res.json().catch(() => ({}))
@@ -177,6 +180,40 @@ export default function TutorProfilePanel() {
         )}
       </section>
 
+      {/* Location */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className={sectionTitle}>Location</h2>
+          {!editingLocation && (
+            <button
+              onClick={() => { setLocationDraft(tutor.location); setEditingLocation(true); setError('') }}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        {editingLocation ? (
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
+              placeholder="City, State"
+              className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => save({ location: locationDraft })} disabled={saving}
+                className="bg-gray-900 text-white text-sm px-4 py-2 rounded-md hover:bg-gray-700 transition disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingLocation(false)} disabled={saving} className="text-sm text-gray-600 hover:text-gray-900 px-2 py-2">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">{tutor.location || 'No location yet. Add one so families know where you teach.'}</p>
+        )}
+      </section>
+
       {/* Instruments / proficiency */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -281,6 +318,7 @@ export default function TutorProfilePanel() {
 
       {showScheduleModal && (
         <ScheduleLessonModal
+          tutorLocation={tutor.location}
           onClose={() => setShowScheduleModal(false)}
           onScheduled={() => {}}
         />

@@ -27,6 +27,7 @@ async function sendStatusEmail(request: NextRequest, updated: LessonRequest, tut
     requestedDate: updated.requestedDate,
     requestedStartTime: updated.requestedStartTime,
     requestedEndTime: updated.requestedEndTime,
+    location: updated.location,
   }
 
   if (updated.status === 'in_progress') {
@@ -61,6 +62,7 @@ async function sendProposalDecisionEmail(request: NextRequest, updated: LessonRe
       requestedDate: updated.requestedDate,
       requestedStartTime: updated.requestedStartTime,
       requestedEndTime: updated.requestedEndTime,
+      location: updated.location,
       decision: updated.status === 'in_progress' ? 'approved' : 'declined',
       dashboardUrl: new URL('/dashboard/tutor', request.url).toString(),
     }),

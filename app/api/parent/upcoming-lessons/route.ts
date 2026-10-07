@@ -52,6 +52,7 @@ export async function GET() {
           tutorUserId: booking.tutorUserId,
           tutorName: tutorMap[booking.tutorUserId] ?? '',
           childName: booking.childName,
+          location: booking.location,
           lessonRequestId: booking.id,
           proposedBy: row?.proposedBy || null,
           proposedDate: row?.proposedDate || null,

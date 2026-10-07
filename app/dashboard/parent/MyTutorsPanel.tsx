@@ -180,6 +180,7 @@ export default function MyTutorsPanel({ refreshKey, onRemoved }: Props) {
         <BookingModal
           tutorUserId={booking.tutorUserId}
           tutorName={booking.tutorName}
+          tutorLocation={allTutors.find(a => a.userId === booking.tutorUserId)?.location}
           onClose={() => setBooking(null)}
         />
       )}

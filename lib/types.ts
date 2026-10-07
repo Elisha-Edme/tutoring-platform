@@ -141,6 +141,9 @@ export interface LessonRequest {
   // Tutor's required reason for declining a not-yet-accepted request; '' for
   // every other cancellation (self-withdrawal, cancelling an already-live series).
   declineReason: string
+  // Where the lesson takes place. Set once for the whole series (like
+  // childName/message) — there is no per-occurrence override.
+  location: string
 }
 
 // A row is only ever created once something needs to be tracked about a

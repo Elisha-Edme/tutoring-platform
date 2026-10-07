@@ -12,6 +12,7 @@ export interface UpcomingLesson {
   tutorUserId: string
   tutorName: string
   childName: string
+  location: string
   lessonRequestId: string
   proposedBy: 'parent' | 'tutor' | null
   proposedDate: string | null

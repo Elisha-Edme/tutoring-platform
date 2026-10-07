@@ -70,6 +70,7 @@ export async function PATCH(
           newDate: requestedDate,
           newStartTime: requestedStartTime,
           newEndTime: requestedEndTime,
+          location: existing.location,
           dashboardUrl: new URL('/dashboard/parent', request.url).toString(),
         }),
       })

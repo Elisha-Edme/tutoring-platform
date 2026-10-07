@@ -11,7 +11,7 @@ import { DEFAULT_AVATAR_URL } from '@/lib/constants'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { token, name, instruments, bio, credentials, password } = body
+    const { token, name, instruments, bio, credentials, location, password } = body
 
     if (!token || !name || !instruments?.length || !password) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 })
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       bio: bio ?? '',
       school: '',
       credentials: credentials ?? '',
-      location: '',
+      location: location ?? '',
       photoUrl: DEFAULT_AVATAR_URL,
       lessonsCompleted: 0,
       hoursCompleted: 0,

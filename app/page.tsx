@@ -1,7 +1,5 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import Navbar from '@/components/Navbar'
-import { getSession } from '@/lib/auth'
 import HomeStats from './HomeStats'
 
 const STEPS = [
@@ -10,12 +8,7 @@ const STEPS = [
   { n: '3', title: 'Get matched', body: 'Connect with a tutor and start free lessons in your community.' },
 ]
 
-export default async function Home() {
-  // Signed-in users belong on their dashboard, not the marketing page.
-  const session = await getSession()
-  if (session?.role === 'parent') redirect('/dashboard/parent')
-  if (session?.role === 'tutor') redirect('/dashboard/tutor')
-
+export default function Home() {
   return (
     <main className="min-h-screen bg-white">
       <Navbar />

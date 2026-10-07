@@ -108,10 +108,11 @@ function formatDateHeading(iso: string) {
 interface Props {
   tutorUserId: string
   tutorName: string
+  tutorLocation?: string
   onClose: () => void
 }
 
-export default function BookingModal({ tutorUserId, tutorName, onClose }: Props) {
+export default function BookingModal({ tutorUserId, tutorName, tutorLocation, onClose }: Props) {
   // Windows: Record<date, {startTime, endTime}[]>
   const [windows, setWindows] = useState<Record<string, { startTime: string; endTime: string }[]>>({})
   const [children, setChildren] = useState<Child[]>([])
@@ -122,6 +123,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
   const [endTime, setEndTime] = useState('10:00')
   const [selectedChild, setSelectedChild] = useState('')
   const [message, setMessage] = useState('')
+  const [location, setLocation] = useState(tutorLocation ?? '')
   const [dateView, setDateView] = useState<'list' | 'calendar'>('calendar')
 
   const [submitting, setSubmitting] = useState(false)
@@ -187,6 +189,7 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
         requestedStartTime: startTime,
         requestedEndTime: endTime,
         message,
+        location,
       }),
     })
     if (res.ok) {
@@ -226,6 +229,17 @@ export default function BookingModal({ tutorUserId, tutorName, onClose }: Props)
             </div>
 
             {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="Where will the lesson take place?"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
 
             {loading ? (
               <p className="text-sm text-gray-400 py-4">Loading availability…</p>

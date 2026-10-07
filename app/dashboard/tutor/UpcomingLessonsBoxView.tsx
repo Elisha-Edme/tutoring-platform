@@ -46,6 +46,7 @@ export default function UpcomingLessonsBoxView({ lessons, onPropose, onRespond, 
                     {formatTime(l.startTime)}–{formatTime(l.endTime)} EST
                   </p>
                 </div>
+                {l.location && <p className="text-xs text-gray-400">{l.location}</p>}
                 <TutorLessonActions
                   lesson={l}
                   onPropose={onPropose}

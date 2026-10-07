@@ -53,6 +53,7 @@ export async function GET() {
           rescheduledFrom: o.date !== o.templateDate ? o.templateDate : null,
           parentName: parentMap[booking.parentUserId] ?? '',
           childName: booking.childName,
+          location: booking.location,
           lessonRequestId: booking.id,
           proposedBy: row?.proposedBy || null,
           proposedDate: row?.proposedDate || null,

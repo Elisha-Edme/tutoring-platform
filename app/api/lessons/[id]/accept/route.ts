@@ -32,7 +32,11 @@ export async function POST(
 
   // Another request may have been accepted for an overlapping time since
   // this one came in — re-check before graduating it into a live lesson.
-  const conflict = await findSchedulingConflict(existing.tutorUserId, existing)
+  // Exclude this request's own id: Acknowledge already flipped it to
+  // 'in_progress' (which is what makes a booking block time at all), so
+  // without excluding itself here it would always conflict with its own
+  // requested slot — see the same exclusion in lessons/[id]/recurrence.
+  const conflict = await findSchedulingConflict(existing.tutorUserId, existing, existing.id)
   if (conflict) {
     return NextResponse.json(
       { error: `That time is no longer free — conflicts with your schedule on ${conflict.date} at ${formatTime(conflict.startTime)}.` },
@@ -58,6 +62,7 @@ export async function POST(
           requestedDate: existing.requestedDate,
           requestedStartTime: existing.requestedStartTime,
           requestedEndTime: existing.requestedEndTime,
+          location: existing.location,
           dashboardUrl: new URL('/dashboard/parent', request.url).toString(),
         }),
       })

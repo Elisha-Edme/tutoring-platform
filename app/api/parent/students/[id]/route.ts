@@ -59,6 +59,9 @@ export async function PATCH(
       requestedStartTime: existing.proposedLessonStartTime,
       requestedEndTime: existing.proposedLessonEndTime,
       message: '',
+      // Legacy path (pre-dates this concept) — no location was ever
+      // collected on a TutorStudent's proposed schedule.
+      location: '',
       status: 'in_progress',
       initiatedBy: 'tutor',
       createdAt: now,

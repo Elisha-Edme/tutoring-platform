@@ -16,6 +16,7 @@ export default function TutorSignUpForm({ token }: { token: string }) {
   const [instruments, setInstruments] = useState<string[]>([])
   const [bio, setBio] = useState('')
   const [credentials, setCredentials] = useState('')
+  const [location, setLocation] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -64,7 +65,7 @@ export default function TutorSignUpForm({ token }: { token: string }) {
     const res = await fetch('/api/auth/tutor-signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, name, instruments, bio, credentials, password }),
+      body: JSON.stringify({ token, name, instruments, bio, credentials, location, password }),
     })
 
     const data = await res.json()
@@ -144,6 +145,13 @@ export default function TutorSignUpForm({ token }: { token: string }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">Credentials</label>
           <input type="text" value={credentials} onChange={e => setCredentials(e.target.value)}
             placeholder="8 years playing, NYSSMA Level 5"
+            className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+          <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+            placeholder="City, State"
             className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
         </div>
 

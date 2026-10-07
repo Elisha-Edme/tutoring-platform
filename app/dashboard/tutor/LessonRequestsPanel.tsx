@@ -313,6 +313,10 @@ export default function LessonRequestsPanel({ onPendingCountChange }: Props) {
                 : req.recurrenceLabel}
             </p>
 
+            {req.location && (
+              <p className="text-xs text-gray-400 mb-1">{req.location}</p>
+            )}
+
             {req.message && (
               <p className="text-sm text-gray-500 italic border-l-2 border-gray-200 pl-3 my-2">
                 &ldquo;{req.message}&rdquo;

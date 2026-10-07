@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import RecurrenceModal, { type RecurringLessonFormData } from './RecurrenceModal'
 
 const UNIT_NOUNS: Record<RecurringLessonFormData['repeatType'], string> = {
@@ -26,8 +26,16 @@ export default function AddStudentModal({ parentUserId, childName, onClose, onAd
   const [end, setEnd] = useState('17:00')
   const [recurrence, setRecurrence] = useState<RecurringLessonFormData | null>(null)
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false)
+  const [location, setLocation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/tutor/me')
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(d => setLocation(d.tutor?.location ?? ''))
+      .catch(() => {})
+  }, [])
 
   const timesValid = !proposeLesson || (date && start < end)
 
@@ -46,6 +54,7 @@ export default function AddStudentModal({ parentUserId, childName, onClose, onAd
         childName,
         ...(proposeLesson ? {
           proposedLessonDate: date, proposedLessonStartTime: start, proposedLessonEndTime: end,
+          location,
           ...(recurrence ? {
             proposedRepeatType: recurrence.repeatType,
             proposedRepeatInterval: recurrence.repeatInterval,
@@ -101,6 +110,17 @@ export default function AddStudentModal({ parentUserId, childName, onClose, onAd
               <span className="text-gray-400">–</span>
               <input type="time" value={end} onChange={e => setEnd(e.target.value)}
                 className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="Where will the lesson take place?"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
             </div>
 
             {date && start < end && (

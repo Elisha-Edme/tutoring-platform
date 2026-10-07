@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     proposedLessonDate = '', proposedLessonStartTime = '', proposedLessonEndTime = '',
     proposedRepeatType = 'once', proposedRepeatInterval = 1, proposedRepeatDays = [],
     proposedEndsType = 'never', proposedEndsDate = '', proposedEndsAfterCount = 0,
+    location = '',
   } = body
 
   if (!parentUserId || !childName) {
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       requestedStartTime: proposedLessonStartTime,
       requestedEndTime: proposedLessonEndTime,
       message: '',
+      location,
       status: 'in_progress',
       initiatedBy: 'tutor',
       createdAt: now,
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest) {
         proposedLessonDate,
         proposedLessonStartTime,
         proposedLessonEndTime,
+        location,
         recurrenceLabel: proposedLessonDate ? describeLessonRecurrence({
           repeatType: proposedRepeatType, repeatInterval: proposedRepeatInterval, repeatDays: proposedRepeatDays,
           requestedStartTime: proposedLessonStartTime, requestedEndTime: proposedLessonEndTime,

@@ -432,7 +432,7 @@ export async function deleteAvailabilityException(id: string): Promise<void> {
 // Columns: id, parentUserId, childName, tutorUserId,
 //          requestedDate, requestedStartTime, requestedEndTime, message, status, createdAt, updatedAt,
 //          repeatType, repeatInterval, repeatDays, endsType, endsDate, endsAfterCount, initiatedBy,
-//          acceptedAt, declineReason
+//          acceptedAt, declineReason, location
 
 function rowToLessonRequest(row: string[]): LessonRequest {
   return {
@@ -460,6 +460,7 @@ function rowToLessonRequest(row: string[]): LessonRequest {
     initiatedBy: (row[17] || 'parent') as LessonRequest['initiatedBy'],
     acceptedAt: row[18] ?? '',
     declineReason: row[19] ?? '',
+    location: row[20] ?? '',
   }
 }
 
@@ -471,7 +472,7 @@ function lessonRequestToRow(r: LessonRequest): string[] {
     r.message, r.status, r.createdAt, r.updatedAt,
     r.repeatType, String(r.repeatInterval), r.repeatDays.join(','),
     r.endsType, r.endsDate ?? '', String(r.endsAfterCount ?? 0),
-    r.initiatedBy, r.acceptedAt, r.declineReason,
+    r.initiatedBy, r.acceptedAt, r.declineReason, r.location,
   ]
 }
 
@@ -516,7 +517,7 @@ export async function updateLessonRequest(
   const rowNum = i + 2
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID(),
-    range: `LessonRequests!A${rowNum}:T${rowNum}`,
+    range: `LessonRequests!A${rowNum}:U${rowNum}`,
     valueInputOption: 'RAW',
     requestBody: { values: [lessonRequestToRow(updated)] },
   })

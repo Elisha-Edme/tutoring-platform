@@ -150,6 +150,7 @@ export async function cancelOnceBookingIfApplicable(
           requestedDate: booking.requestedDate,
           requestedStartTime: booking.requestedStartTime,
           requestedEndTime: booking.requestedEndTime,
+          location: booking.location,
           dashboardUrl,
         }),
       })
@@ -166,6 +167,7 @@ export async function cancelOnceBookingIfApplicable(
           requestedDate: booking.requestedDate,
           requestedStartTime: booking.requestedStartTime,
           requestedEndTime: booking.requestedEndTime,
+          location: booking.location,
           dashboardUrl,
         }),
       })
