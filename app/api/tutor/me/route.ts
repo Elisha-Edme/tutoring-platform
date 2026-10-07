@@ -34,13 +34,14 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    // Tutors may only edit their own bio, instrument proficiencies, and photo here.
-    const patch: { bio?: string; instruments?: string[]; photoUrl?: string } = {}
+    // Tutors may only edit their own bio, instrument proficiencies, photo, and location here.
+    const patch: { bio?: string; instruments?: string[]; photoUrl?: string; location?: string } = {}
     if (typeof body.bio === 'string') patch.bio = body.bio.trim()
     if (Array.isArray(body.instruments)) {
       patch.instruments = body.instruments.filter((x: unknown) => typeof x === 'string')
     }
     if (typeof body.photoUrl === 'string') patch.photoUrl = body.photoUrl.trim()
+    if (typeof body.location === 'string') patch.location = body.location.trim()
 
     const tutor = await updateTutorProfile(session.userId, patch)
     if (!tutor) return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })

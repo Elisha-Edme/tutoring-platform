@@ -17,11 +17,8 @@ export default async function Navbar() {
       </Link>
 
       <div className="hidden md:flex items-center gap-8 text-sm text-gray-600">
-        {session ? (
-          <Link href={dashboardHref} className="hover:text-gray-900">Dashboard</Link>
-        ) : (
-          <Link href="/" className="hover:text-gray-900">Home</Link>
-        )}
+        <Link href="/" className="hover:text-gray-900">Home</Link>
+        {session && <Link href={dashboardHref} className="hover:text-gray-900">Dashboard</Link>}
         <Link href="/tutors" className="hover:text-gray-900">Find a Tutor</Link>
         <Link href="/contact" className="hover:text-gray-900">Contact Us</Link>
       </div>

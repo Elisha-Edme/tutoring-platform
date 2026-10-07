@@ -88,11 +88,12 @@ interface ApprovedStudent {
 }
 
 interface Props {
+  tutorLocation?: string
   onClose: () => void
   onScheduled: () => void
 }
 
-export default function ScheduleLessonModal({ onClose, onScheduled }: Props) {
+export default function ScheduleLessonModal({ tutorLocation, onClose, onScheduled }: Props) {
   const [students, setStudents] = useState<ApprovedStudent[]>([])
   const [studentsLoading, setStudentsLoading] = useState(true)
   const [selected, setSelected] = useState<ApprovedStudent | null>(null)
@@ -100,6 +101,7 @@ export default function ScheduleLessonModal({ onClose, onScheduled }: Props) {
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('16:00')
   const [endTime, setEndTime] = useState('17:00')
+  const [location, setLocation] = useState(tutorLocation ?? '')
 
   const [recurrence, setRecurrence] = useState<RecurringLessonFormData | null>(null)
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false)
@@ -134,6 +136,7 @@ export default function ScheduleLessonModal({ onClose, onScheduled }: Props) {
         requestedDate: date,
         requestedStartTime: startTime,
         requestedEndTime: endTime,
+        location,
         ...(recurrence ? {
           repeatType: recurrence.repeatType,
           repeatInterval: recurrence.repeatInterval,
@@ -179,6 +182,17 @@ export default function ScheduleLessonModal({ onClose, onScheduled }: Props) {
             </div>
 
             {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="Where will the lesson take place?"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
 
             {/* Step 1 — pick a student */}
             <div className="mb-5">

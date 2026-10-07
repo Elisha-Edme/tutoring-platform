@@ -37,6 +37,7 @@ export function lessonRequestEmailHtml({
   requestedStartTime,
   requestedEndTime,
   message,
+  location,
   dashboardUrl,
 }: {
   tutorName: string
@@ -47,6 +48,7 @@ export function lessonRequestEmailHtml({
   requestedStartTime: string
   requestedEndTime: string
   message: string
+  location?: string
   dashboardUrl: string
 }): string {
   const formattedDate = new Date(`${requestedDate}T00:00:00`).toLocaleDateString('en-US', {
@@ -70,6 +72,7 @@ export function lessonRequestEmailHtml({
     <tr><td style="padding:8px 0;color:#888">Child</td><td style="padding:8px 0">${childName}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Requested date</td><td style="padding:8px 0">${formattedDate}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${fmt(requestedStartTime)} – ${fmt(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   ${message ? `<p style="background:#f5f5f5;padding:12px 16px;border-radius:6px;margin:0 0 20px">"${message}"</p>` : ''}
   <p style="margin-bottom:4px">Reply directly to this email to get in touch with ${parentName}.</p>
@@ -94,7 +97,7 @@ function formatTime12h(t: string): string {
 }
 
 export function lessonAcceptedEmailHtml({
-  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, dashboardUrl,
+  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -102,6 +105,7 @@ export function lessonAcceptedEmailHtml({
   requestedDate: string
   requestedStartTime: string
   requestedEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -111,6 +115,7 @@ export function lessonAcceptedEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to view the details.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -119,7 +124,7 @@ export function lessonAcceptedEmailHtml({
 }
 
 export function lessonCancelledEmailHtml({
-  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, declineReason, dashboardUrl,
+  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, location, declineReason, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -127,6 +132,7 @@ export function lessonCancelledEmailHtml({
   requestedDate: string
   requestedStartTime: string
   requestedEndTime: string
+  location?: string
   declineReason?: string
   dashboardUrl: string
 }): string {
@@ -137,6 +143,7 @@ export function lessonCancelledEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
     ${declineReason ? `<tr><td style="padding:8px 0;color:#888">Reason</td><td style="padding:8px 0">${declineReason}</td></tr>` : ''}
   </table>
   <p style="margin-top:0">You can <a href="${dashboardUrl}">browse tutors</a> and request another lesson any time.</p>
@@ -146,7 +153,7 @@ export function lessonCancelledEmailHtml({
 }
 
 export function lessonCancelledByParentEmailHtml({
-  tutorName, parentName, childName, requestedDate, requestedStartTime, requestedEndTime, dashboardUrl,
+  tutorName, parentName, childName, requestedDate, requestedStartTime, requestedEndTime, location, dashboardUrl,
 }: {
   tutorName: string
   parentName: string
@@ -154,6 +161,7 @@ export function lessonCancelledByParentEmailHtml({
   requestedDate: string
   requestedStartTime: string
   requestedEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -163,6 +171,7 @@ export function lessonCancelledByParentEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to see your other upcoming lessons.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -240,7 +249,7 @@ export function lessonSummaryReadyEmailHtml({
 }
 
 export function preLessonReminderEmailHtml({
-  audience, recipientName, tutorName, childName, occurrenceDate, occurrenceStartTime, occurrenceEndTime, thresholdHours, dashboardUrl,
+  audience, recipientName, tutorName, childName, occurrenceDate, occurrenceStartTime, occurrenceEndTime, location, thresholdHours, dashboardUrl,
 }: {
   audience: 'parent' | 'tutor'
   recipientName: string
@@ -249,6 +258,7 @@ export function preLessonReminderEmailHtml({
   occurrenceDate: string
   occurrenceStartTime: string
   occurrenceEndTime: string
+  location?: string
   thresholdHours: 24 | 1
   dashboardUrl: string
 }): string {
@@ -263,6 +273,7 @@ export function preLessonReminderEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(occurrenceDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(occurrenceStartTime)} – ${formatTime12h(occurrenceEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> for details.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -271,7 +282,7 @@ export function preLessonReminderEmailHtml({
 }
 
 export function lessonScheduledEmailHtml({
-  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, recurrenceLabel, dashboardUrl,
+  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, recurrenceLabel, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -280,6 +291,7 @@ export function lessonScheduledEmailHtml({
   requestedStartTime: string
   requestedEndTime: string
   recurrenceLabel: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -290,6 +302,7 @@ export function lessonScheduledEmailHtml({
     <tr><td style="padding:8px 0;color:#888;width:140px">First lesson</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
     <tr><td style="padding:8px 0;color:#888">Schedule</td><td style="padding:8px 0">${recurrenceLabel}</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to see it under Upcoming Lessons.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -298,7 +311,7 @@ export function lessonScheduledEmailHtml({
 }
 
 export function lessonProposalDecisionEmailHtml({
-  tutorName, parentName, childName, requestedDate, requestedStartTime, requestedEndTime, decision, dashboardUrl,
+  tutorName, parentName, childName, requestedDate, requestedStartTime, requestedEndTime, location, decision, dashboardUrl,
 }: {
   tutorName: string
   parentName: string
@@ -306,6 +319,7 @@ export function lessonProposalDecisionEmailHtml({
   requestedDate: string
   requestedStartTime: string
   requestedEndTime: string
+  location?: string
   decision: 'approved' | 'declined'
   dashboardUrl: string
 }): string {
@@ -317,6 +331,7 @@ export function lessonProposalDecisionEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> for details.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -325,7 +340,7 @@ export function lessonProposalDecisionEmailHtml({
 }
 
 export function lessonTimeChangedEmailHtml({
-  parentName, tutorName, childName, oldDate, oldStartTime, oldEndTime, newDate, newStartTime, newEndTime, dashboardUrl,
+  parentName, tutorName, childName, oldDate, oldStartTime, oldEndTime, newDate, newStartTime, newEndTime, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -336,6 +351,7 @@ export function lessonTimeChangedEmailHtml({
   newDate: string
   newStartTime: string
   newEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -345,6 +361,7 @@ export function lessonTimeChangedEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Was</td><td style="padding:8px 0;color:#999;text-decoration:line-through">${formatDateLong(oldDate)}, ${formatTime12h(oldStartTime)} – ${formatTime12h(oldEndTime)} EST</td></tr>
     <tr><td style="padding:8px 0;color:#888">Now</td><td style="padding:8px 0">${formatDateLong(newDate)}, ${formatTime12h(newStartTime)} – ${formatTime12h(newEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to view the details.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -354,7 +371,7 @@ export function lessonTimeChangedEmailHtml({
 
 export function addStudentRequestEmailHtml({
   parentName, tutorName, childName, proposedLessonDate, proposedLessonStartTime, proposedLessonEndTime,
-  recurrenceLabel, dashboardUrl,
+  recurrenceLabel, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -363,6 +380,7 @@ export function addStudentRequestEmailHtml({
   proposedLessonStartTime: string
   proposedLessonEndTime: string
   recurrenceLabel?: string
+  location?: string
   dashboardUrl: string
 }): string {
   const proposedLessonBlock = proposedLessonDate ? `
@@ -370,6 +388,7 @@ export function addStudentRequestEmailHtml({
     <tr><td style="padding:8px 0;color:#888;width:140px">Next lesson</td><td style="padding:8px 0">${formatDateLong(proposedLessonDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(proposedLessonStartTime)} – ${formatTime12h(proposedLessonEndTime)} EST</td></tr>
     ${recurrenceLabel && recurrenceLabel !== 'One-time lesson' ? `<tr><td style="padding:8px 0;color:#888">Schedule</td><td style="padding:8px 0">${recurrenceLabel}</td></tr>` : ''}
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>` : ''
   return `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111">
@@ -432,7 +451,7 @@ export function lessonCompletedEmailHtml({
 }
 
 export function lessonConfirmedEmailHtml({
-  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, dashboardUrl,
+  parentName, tutorName, childName, requestedDate, requestedStartTime, requestedEndTime, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -440,6 +459,7 @@ export function lessonConfirmedEmailHtml({
   requestedDate: string
   requestedStartTime: string
   requestedEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -449,6 +469,7 @@ export function lessonConfirmedEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Date</td><td style="padding:8px 0">${formatDateLong(requestedDate)}</td></tr>
     <tr><td style="padding:8px 0;color:#888">Time</td><td style="padding:8px 0">${formatTime12h(requestedStartTime)} – ${formatTime12h(requestedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to see it under Upcoming Lessons.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -458,7 +479,7 @@ export function lessonConfirmedEmailHtml({
 
 export function lessonTimeProposedEmailHtml({
   recipientName, proposerName, childName, oldDate, oldStartTime, oldEndTime,
-  proposedDate, proposedStartTime, proposedEndTime, dashboardUrl,
+  proposedDate, proposedStartTime, proposedEndTime, location, dashboardUrl,
 }: {
   recipientName: string
   proposerName: string
@@ -469,6 +490,7 @@ export function lessonTimeProposedEmailHtml({
   proposedDate: string
   proposedStartTime: string
   proposedEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -481,6 +503,7 @@ export function lessonTimeProposedEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Currently</td><td style="padding:8px 0;color:#999;text-decoration:line-through">${formatDateLong(oldDate)}, ${formatTime12h(oldStartTime)} – ${formatTime12h(oldEndTime)} EST</td></tr>
     <tr><td style="padding:8px 0;color:#888">Suggested</td><td style="padding:8px 0">${formatDateLong(proposedDate)}, ${formatTime12h(proposedStartTime)} – ${formatTime12h(proposedEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to approve or decline.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
@@ -512,7 +535,7 @@ export function lessonTimeProposalDecisionEmailHtml({
 
 export function lessonTimeOverriddenEmailHtml({
   parentName, tutorName, childName, oldDate, oldStartTime, oldEndTime,
-  newDate, newStartTime, newEndTime, dashboardUrl,
+  newDate, newStartTime, newEndTime, location, dashboardUrl,
 }: {
   parentName: string
   tutorName: string
@@ -523,6 +546,7 @@ export function lessonTimeOverriddenEmailHtml({
   newDate: string
   newStartTime: string
   newEndTime: string
+  location?: string
   dashboardUrl: string
 }): string {
   return `
@@ -532,6 +556,7 @@ export function lessonTimeOverriddenEmailHtml({
   <table style="border-collapse:collapse;width:100%;margin:20px 0">
     <tr><td style="padding:8px 0;color:#888;width:140px">Was</td><td style="padding:8px 0;color:#999;text-decoration:line-through">${formatDateLong(oldDate)}, ${formatTime12h(oldStartTime)} – ${formatTime12h(oldEndTime)} EST</td></tr>
     <tr><td style="padding:8px 0;color:#888">Now</td><td style="padding:8px 0">${formatDateLong(newDate)}, ${formatTime12h(newStartTime)} – ${formatTime12h(newEndTime)} EST</td></tr>
+    ${location ? `<tr><td style="padding:8px 0;color:#888">Location</td><td style="padding:8px 0">${location}</td></tr>` : ''}
   </table>
   <p style="margin-top:0"><a href="${dashboardUrl}">Open your dashboard</a> to view the details.</p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>

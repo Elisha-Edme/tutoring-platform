@@ -168,6 +168,9 @@ export default function LessonRequestsList() {
                       ? `${formatDate(req.requestedDate)} · ${formatTime(req.requestedStartTime)}–${formatTime(req.requestedEndTime)} EST`
                       : req.recurrenceLabel}
                   </p>
+                  {req.location && (
+                    <p className="text-xs text-gray-400 mt-0.5">{req.location}</p>
+                  )}
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${statusBadge(req).color}`}>
                   {statusBadge(req).label}

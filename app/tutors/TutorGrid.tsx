@@ -32,6 +32,10 @@ function TutorCard({ tutor, isParent, isSignedIn, onBook }: TutorCardProps) {
           <p className="font-semibold text-gray-900">{tutor.name}</p>
           <p className="text-sm text-gray-500 mb-1">{tutor.instruments.join(', ')}</p>
 
+          {tutor.location && (
+            <p className="text-xs text-gray-400 mb-1">{tutor.location}</p>
+          )}
+
           <p className="text-xs text-gray-400 mb-1">
             {tutor.lessonsCompleted} lessons · {formatHours(tutor.hoursCompleted)} hrs
           </p>
@@ -150,6 +154,7 @@ export default function TutorGrid({ isParent, isSignedIn }: { isParent?: boolean
         <BookingModal
           tutorUserId={bookingTutor.userId}
           tutorName={bookingTutor.name}
+          tutorLocation={bookingTutor.location}
           onClose={() => setBookingTutor(null)}
         />
       )}

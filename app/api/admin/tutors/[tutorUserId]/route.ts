@@ -85,6 +85,7 @@ export async function GET(
       ...o,
       childName: requestsById.get(o.lessonRequestId)?.childName ?? '',
       parentName: parentMap[o.parentUserId]?.name ?? '(unknown)',
+      location: requestsById.get(o.lessonRequestId)?.location ?? '',
     }))
     .sort((a, b) => b.occurrenceDate.localeCompare(a.occurrenceDate))
 

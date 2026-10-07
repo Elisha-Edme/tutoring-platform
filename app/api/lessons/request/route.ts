@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     requestedStartTime,
     requestedEndTime,
     message = '',
+    location = '',
     repeatType = 'once',
     repeatInterval = 1,
     repeatDays = [],
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     requestedStartTime,
     requestedEndTime,
     message,
+    location,
     status: 'pending',
     initiatedBy: 'parent',
     acceptedAt: '',
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
         requestedStartTime,
         requestedEndTime,
         message,
+        location,
         dashboardUrl: new URL('/dashboard/tutor', request.url).toString(),
       }),
     })

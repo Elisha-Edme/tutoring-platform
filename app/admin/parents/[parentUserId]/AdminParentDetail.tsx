@@ -6,7 +6,7 @@ import type { ParentProfile, LessonRequest, LessonOccurrence } from '@/lib/types
 import { formatTime } from '@/lib/schedule'
 
 type EnrichedRequest = LessonRequest & { tutorName: string; recurrenceLabel: string }
-type EnrichedOccurrence = LessonOccurrence & { tutorName: string; childName: string }
+type EnrichedOccurrence = LessonOccurrence & { tutorName: string; childName: string; location: string }
 
 interface Detail {
   profile: ParentProfile
@@ -126,6 +126,7 @@ export default function AdminParentDetail({ parentUserId }: { parentUserId: stri
                     ? `${formatDate(req.requestedDate)} · ${formatTime(req.requestedStartTime)}–${formatTime(req.requestedEndTime)} EST`
                     : req.recurrenceLabel}
                 </p>
+                {req.location && <p className="text-xs text-gray-400">{req.location}</p>}
                 {req.status === 'cancelled' && req.declineReason && (
                   <p className="text-xs text-gray-500 mt-1">Declined: {req.declineReason}</p>
                 )}
@@ -146,6 +147,7 @@ export default function AdminParentDetail({ parentUserId }: { parentUserId: stri
                     <p className="text-xs text-gray-500">
                       Tutor: {o.tutorName} · {formatDate(o.occurrenceDate)} · {formatTime(o.occurrenceStartTime)}–{formatTime(o.occurrenceEndTime)} EST
                     </p>
+                    {o.location && <p className="text-xs text-gray-400">{o.location}</p>}
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${OCCURRENCE_STATUS_COLORS[o.status]}`}>
                     {OCCURRENCE_STATUS_LABELS[o.status]}

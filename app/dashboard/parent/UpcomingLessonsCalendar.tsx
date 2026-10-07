@@ -119,6 +119,9 @@ export default function UpcomingLessonsCalendar({ lessons, onPropose, onRespond,
                 </svg>
                 {formatTime(detail.startTime)}–{formatTime(detail.endTime)} EST
               </div>
+              {detail.location && (
+                <p className="text-xs text-gray-500 mt-1 pl-[19px]">{detail.location}</p>
+              )}
             </div>
             <div className="px-5 py-4">
               <ParentLessonActions

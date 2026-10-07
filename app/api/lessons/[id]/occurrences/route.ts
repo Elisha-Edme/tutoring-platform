@@ -183,6 +183,7 @@ export async function POST(
           proposedDate: proposedDate!,
           proposedStartTime: proposedStartTime!,
           proposedEndTime: proposedEndTime!,
+          location: booking.location,
           dashboardUrl: dashboardUrl(recipientRole),
         }),
       })
@@ -214,6 +215,7 @@ export async function POST(
           newDate: proposedDate!,
           newStartTime: proposedStartTime!,
           newEndTime: proposedEndTime!,
+          location: booking.location,
           dashboardUrl: dashboardUrl('parent'),
         }),
       })

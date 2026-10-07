@@ -11,6 +11,7 @@ export interface UpcomingLesson {
   rescheduledFrom: string | null
   parentName: string
   childName: string
+  location: string
   lessonRequestId: string
   proposedBy: 'parent' | 'tutor' | null
   proposedDate: string | null
